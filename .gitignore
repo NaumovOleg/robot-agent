@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.DS_Store
+coverage/
+./server.ts
+testing/
+src/examples/mock/*
+*.tsbuildinfo
+*.log

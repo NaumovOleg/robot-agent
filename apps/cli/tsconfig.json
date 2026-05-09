@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../../",
+    "outDir": "./dist",
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "es2023"],
+    "types": ["node"],
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@providers": ["./src/providers/index.ts"],
+      "@hooks": ["./src/hooks/index.ts"],
+      "@screens": ["./src/screens/index.ts"],
+      "@types": ["./src/types/index.ts"],
+      "@components": ["./src/components/index.ts"],
+      "@robocode-packages/agent": ["../../packages/agent/src/index.ts"],
+      "@robocode-packages/config": ["../../packages/config/src/index.ts"],
+      "@robocode-packages/core": ["../../packages/core/src/index.ts"],
+      "@robocode-packages/providers": ["../../packages/providers/src/index.ts"],
+      "@robocode-packages/shared": ["../../packages/shared/src/index.ts"],
+      "@robocode-packages/tools": ["../../packages/tools/src/index.ts"],
+      "@robocode-packages/ui": ["../../packages/ui/src/index.ts"]
+    }
+  },
+  "include": ["src", "../../packages/*/src"]
+}
