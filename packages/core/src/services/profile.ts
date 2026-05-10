@@ -1,6 +1,7 @@
 import { PROFILES_PATH } from '@robocode-packages/config';
 import type { Profile } from '@robocode-packages/shared';
 import { FileSystem, Vault, profileApiKey } from '@robocode-packages/shared';
+import crypto from 'node:crypto';
 
 export class ProfileConfig {
   static readonly profiles_config_path = PROFILES_PATH;
@@ -8,13 +9,14 @@ export class ProfileConfig {
     return FileSystem.loadJson<Profile[]>(this.profiles_config_path) ?? [];
   }
 
-  static async add(profile: Omit<Profile, 'active'>) {
+  static async add({ apiKey, ...data }: Omit<Profile, 'active' | 'id'>) {
     const profiles = this.list().map((p) => ({ ...p, active: false }));
-    const { apiKey, ...data } = profile;
-    profiles.push({ ...data, apiKey: '', active: true });
+    const profile = { ...data, active: true, id: crypto.randomUUID(), apiKey: '' };
+    profiles.push(profile);
 
-    await Vault.set(profileApiKey(profile.name), apiKey);
-    return FileSystem.writeJson(this.profiles_config_path, profiles);
+    await Vault.set(profileApiKey(profile.id), apiKey ?? 'apikey');
+    FileSystem.writeJson(this.profiles_config_path, profiles);
+    return profile;
   }
 
   static update(profile: Partial<Profile>) {
@@ -22,17 +24,18 @@ export class ProfileConfig {
       if (profile.active) {
         p.active = false;
       }
-      if (p.name === profile.name) {
+      if (p.name === profile.name || p.id === profile.id) {
         p = { ...p, ...profile };
       }
       return p;
     });
 
-    return FileSystem.writeJson(this.profiles_config_path, profiles);
+    FileSystem.writeJson(this.profiles_config_path, profiles);
+    return profile;
   }
 
-  static set(name: string) {
-    return this.update({ name, active: true });
+  static set(id: string) {
+    return this.update({ id, active: true });
   }
 
   static active(): Profile {
@@ -40,8 +43,14 @@ export class ProfileConfig {
     return list.find((p) => p.active) ?? list[0];
   }
 
-  static delete(name: string) {
-    const list = this.list().filter((p) => p.name !== name);
-    return FileSystem.writeJson(this.profiles_config_path, list);
+  static delete(id: string) {
+    const list = this.list().filter((p) => p.id !== id);
+    const active = list.find((el) => el.active);
+    if (!active) {
+      list[0].active = true;
+    }
+
+    FileSystem.writeJson(this.profiles_config_path, list);
+    return list;
   }
 }

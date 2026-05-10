@@ -4,6 +4,7 @@ export interface Profile {
   model: string;
   apiKey: string;
   active: boolean;
+  id: string;
 }
 
 export interface Config {

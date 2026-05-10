@@ -10,29 +10,19 @@ interface Props {
 export const ProfileProvider: React.FC<Props> = ({ children }) => {
   const [profiles, setProfiles] = useState<Profile[]>(() => ProfileConfig.list());
 
-  const add = (profile: Omit<Profile, 'active'>) => {
-    setProfiles((prev) => {
-      const updated = prev.map((p) => ({ ...p, active: false }));
-      updated.push({ ...profile, active: true });
-      ProfileConfig.add(profile);
-      return updated;
-    });
+  const add = async (profile: Omit<Profile, 'active' | 'id'>) => {
+    await ProfileConfig.add(profile);
+    setProfiles(ProfileConfig.list());
   };
 
-  const del = (name: string) => {
-    setProfiles((prev) => {
-      const updated = prev.filter((p) => p.name !== name);
-      ProfileConfig.delete(name);
-      return updated;
-    });
+  const del = (id: string) => {
+    ProfileConfig.delete(id);
+    setProfiles((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const set = (name: string) => {
-    setProfiles((prev) => {
-      const updated = prev.map((p) => ({ ...p, active: p.name === name }));
-      ProfileConfig.set(name);
-      return updated;
-    });
+  const set = (id: string) => {
+    ProfileConfig.set(id);
+    setProfiles((prev) => prev.map((p) => ({ ...p, active: p.id === id })));
   };
 
   const active = () => profiles.find((p) => p.active) ?? profiles[0];
@@ -40,18 +30,16 @@ export const ProfileProvider: React.FC<Props> = ({ children }) => {
   const list = () => profiles;
 
   const update = (partial: Partial<Profile>): Profile => {
-    let updated!: Profile;
-    setProfiles((prev) => {
-      const next = prev.map((p) => {
-        if (!p.active) return p;
-        updated = { ...p, ...partial };
-        return updated;
-      });
-      ProfileConfig.update(partial);
-      return next;
-    });
+    if (!partial.id) throw new Error('update requires id');
 
-    return updated;
+    const updated = profiles.find((p) => p.id === partial.id);
+    if (!updated) throw new Error(`Profile ${partial.id} not found`);
+
+    const next = { ...updated, ...partial };
+    ProfileConfig.update(partial);
+    setProfiles((prev) => prev.map((p) => (p.id === partial.id ? next : p)));
+
+    return next;
   };
 
   const value = useMemo(

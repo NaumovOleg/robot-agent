@@ -21,7 +21,8 @@
     "dev": "pnpm --filter robocode dev",
     "lint": "eslint . --ext .ts,.tsx",
     "clean": "rm -rf node_modules **/node_modules **/dist",
-    "bootstrap": "pnpm install && pnpm -r run build"
+    "bootstrap": "pnpm install && pnpm -r run build",
+    "debug": "tail -f ~/.robocode/debug.log"
   },
   "dependencies": {
     "@changesets/cli": "^2.31.0",

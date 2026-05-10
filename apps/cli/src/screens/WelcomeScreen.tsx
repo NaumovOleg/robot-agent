@@ -13,7 +13,7 @@ const NEW_SESSION = '+ new session';
 export const WelcomeScreen: React.FC = () => {
   const { list, active } = useProfile();
   const { navigate } = useRouter();
-  const { list: sessions, active: activeSession } = useSession();
+  const { list: sessions, create, set: setSession } = useSession();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
@@ -23,19 +23,40 @@ export const WelcomeScreen: React.FC = () => {
 
   useInput((input, key) => {
     if (!activeProfile) {
-      if (input === 'y' || input === 'Y') navigate('profile');
-      if (input === 'n' || input === 'N' || key.escape) navigate('assistant');
+      if (input === 'y' || input === 'Y') {
+        navigate('profile');
+        return;
+      }
+      if (input === 'n' || input === 'N' || key.escape) {
+        navigate('assistant');
+        return;
+      }
       return;
     }
 
-    if (key.downArrow) setSelectedIndex((i) => Math.min(i + 1, sessionItems.length - 1));
-    if (key.upArrow) setSelectedIndex((i) => Math.max(i - 1, 0));
-
-    if (input === ' ' || key.return) {
-      navigate('assistant');
+    if (key.downArrow) {
+      setSelectedIndex((i) => Math.min(i + 1, sessionItems.length - 1));
+      return;
+    }
+    if (key.upArrow) {
+      setSelectedIndex((i) => Math.max(i - 1, 0));
+      return;
     }
 
-    if (input === 'p' || input === 'P') navigate('profile');
+    if (input === ' ' || key.return) {
+      const selected = sessionItems[selectedIndex];
+      if (selected === NEW_SESSION) {
+        create();
+        navigate('assistant');
+      } else {
+        const session = sessions.find((s) => s.name === selected);
+        if (session) {
+          setSession(session.id);
+          navigate('assistant');
+        }
+      }
+      return;
+    }
   });
 
   return (
@@ -96,7 +117,6 @@ export const WelcomeScreen: React.FC = () => {
           </Box>
         </Box>
       ) : (
-        /* HAS PROFILE — SESSION LIST */
         <Box flexDirection="column" gap={1}>
           <Box paddingLeft={2} marginBottom={1}>
             <Text color="white">Welcome back 👋 </Text>
@@ -126,7 +146,7 @@ export const WelcomeScreen: React.FC = () => {
           </Box>
 
           <Box paddingLeft={2} marginTop={1}>
-            <Text dimColor>↑↓ navigate ENTER/SPACE = open P = profiles Ctrl+C = exit</Text>
+            <Text dimColor>↑↓ navigate ENTER = open TAB = switch page</Text>
           </Box>
         </Box>
       )}

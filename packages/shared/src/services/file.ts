@@ -6,6 +6,7 @@ import {
   loadJsonFile,
   deleteFile,
   readFile,
+  writeFile,
 } from '../utils/fs';
 
 export class FileSystem {
@@ -35,7 +36,7 @@ export class FileSystem {
   static readonly readFile = (pathname: string) => {
     return readFile(pathname);
   };
-  static readonly writeFile = (content: string, pathname: string) => {
-    return readFile(pathname);
+  static readonly writeFile = (pathname: string, content: string) => {
+    return writeFile(pathname, content);
   };
 }
