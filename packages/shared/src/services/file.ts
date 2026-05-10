@@ -5,6 +5,7 @@ import {
   renameDir,
   loadJsonFile,
   deleteFile,
+  readFile,
 } from '../utils/fs';
 
 export class FileSystem {
@@ -12,8 +13,8 @@ export class FileSystem {
     return loadJsonFile<T>(pathname);
   }
 
-  static readonly writeJson = <T>(content: T, pathname: string): void => {
-    return saveJsonFile(content, pathname);
+  static readonly writeJson = <T>(pathname: string, content: T): void => {
+    return saveJsonFile(pathname, content);
   };
 
   static readonly deleteFile = (name: string) => {
@@ -23,19 +24,18 @@ export class FileSystem {
   static deleteDir(name: string) {
     return deleteDir(name);
   }
-  static readonly renameFile = (
-    oldPath: string,
-
-    newPath: string
-  ) => {
+  static readonly renameFile = (oldPath: string, newPath: string) => {
     return renameFile(oldPath, newPath);
   };
 
-  static readonly renameDir = (
-    oldPath: string,
-
-    newPath: string
-  ) => {
+  static readonly renameDir = (oldPath: string, newPath: string) => {
     return renameDir(oldPath, newPath);
+  };
+
+  static readonly readFile = (pathname: string) => {
+    return readFile(pathname);
+  };
+  static readonly writeFile = (content: string, pathname: string) => {
+    return readFile(pathname);
   };
 }

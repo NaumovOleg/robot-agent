@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useRouter, useProfile } from '@hooks';
+import { useRouter, useProfile, useSession } from '@hooks';
 
 const ROBOT_LOGO = [
   '  ╦═╗╔═╗╔╗ ╔═╗╔═╗╔═╗╔╦╗╔═╗',
@@ -8,33 +8,23 @@ const ROBOT_LOGO = [
   '  ╩╚═╚═╝╚═╝╚═╝╚═╝╚═╝═╩╝╚═╝',
 ];
 
-interface Session {
-  id: string;
-  name: string;
-}
-
-const MOCK_SESSIONS: Session[] = [
-  { id: '1', name: 'Fix auth bug in Express' },
-  { id: '2', name: 'Refactor database layer' },
-  { id: '3', name: 'Write unit tests for API' },
-];
-
 const NEW_SESSION = '+ new session';
 
 export const WelcomeScreen: React.FC = () => {
   const { list, active } = useProfile();
   const { navigate } = useRouter();
+  const { list: sessions, active: activeSession } = useSession();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
 
-  const sessionItems = [...MOCK_SESSIONS.map((s) => s.name), NEW_SESSION];
+  const sessionItems = [...sessions.map((s) => s.name), NEW_SESSION];
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((input, key) => {
     if (!activeProfile) {
       if (input === 'y' || input === 'Y') navigate('profile');
-      if (input === 'n' || input === 'N' || key.escape) navigate('chat');
+      if (input === 'n' || input === 'N' || key.escape) navigate('assistant');
       return;
     }
 
@@ -42,7 +32,7 @@ export const WelcomeScreen: React.FC = () => {
     if (key.upArrow) setSelectedIndex((i) => Math.max(i - 1, 0));
 
     if (input === ' ' || key.return) {
-      navigate('chat');
+      navigate('assistant');
     }
 
     if (input === 'p' || input === 'P') navigate('profile');

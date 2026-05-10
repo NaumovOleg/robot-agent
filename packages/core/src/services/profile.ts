@@ -8,16 +8,16 @@ export class ProfileConfig {
     return FileSystem.loadJson<Profile[]>(this.profiles_config_path) ?? [];
   }
 
-  static readonly add = (profile: Omit<Profile, 'active'>): void => {
+  static async add(profile: Omit<Profile, 'active'>) {
     const profiles = this.list().map((p) => ({ ...p, active: false }));
     const { apiKey, ...data } = profile;
     profiles.push({ ...data, apiKey: '', active: true });
 
-    Vault.set(profileApiKey(profile.name), apiKey);
-    return FileSystem.writeJson(profiles, this.profiles_config_path);
-  };
+    await Vault.set(profileApiKey(profile.name), apiKey);
+    return FileSystem.writeJson(this.profiles_config_path, profiles);
+  }
 
-  static readonly update = (profile: Partial<Profile>): void => {
+  static update(profile: Partial<Profile>) {
     const profiles = this.list().map((p) => {
       if (profile.active) {
         p.active = false;
@@ -28,20 +28,20 @@ export class ProfileConfig {
       return p;
     });
 
-    return FileSystem.writeJson(profiles, this.profiles_config_path);
-  };
+    return FileSystem.writeJson(this.profiles_config_path, profiles);
+  }
 
-  static readonly set = (name: string): void => {
+  static set(name: string) {
     return this.update({ name, active: true });
-  };
+  }
 
-  static readonly active = (): Profile => {
+  static active(): Profile {
     const list = this.list();
     return list.find((p) => p.active) ?? list[0];
-  };
+  }
 
-  static readonly delete = (name: string) => {
+  static delete(name: string) {
     const list = this.list().filter((p) => p.name !== name);
-    return FileSystem.writeJson(list, this.profiles_config_path);
-  };
+    return FileSystem.writeJson(this.profiles_config_path, list);
+  }
 }

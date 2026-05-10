@@ -1,6 +1,6 @@
-import { Box, Text, useInput } from 'ink';
-import { WelcomeScreen, ProfileScreen } from './screens';
-import { RouterProvider, ProfileProvider } from '@providers';
+import { Box, Text } from 'ink';
+import { WelcomeScreen, ProfileScreen, ChatScreen } from '@screens';
+import { RouterProvider, ProfileProvider, SessionProvider } from '@providers';
 import { useRouter, useProfile } from '@hooks';
 import { Navigation } from '@components';
 
@@ -11,7 +11,7 @@ const Screen = () => {
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
 
-  if (route === 'chat' && !activeProfile) {
+  if (route === 'assistant' && !activeProfile) {
     navigate('welcome');
     return null;
   }
@@ -21,6 +21,8 @@ const Screen = () => {
       return <WelcomeScreen key="welcome" />;
     case 'profile':
       return <ProfileScreen key="profile" />;
+    case 'assistant':
+      return <ChatScreen key="chat" />;
     default:
       return <Text>Loading...</Text>;
   }
@@ -40,7 +42,9 @@ const App = () => {
 export const APP = (
   <RouterProvider>
     <ProfileProvider>
-      <App />
+      <SessionProvider>
+        <App />
+      </SessionProvider>
     </ProfileProvider>
   </RouterProvider>
 );

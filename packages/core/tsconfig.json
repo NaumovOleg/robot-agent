@@ -6,7 +6,9 @@
     "types": ["node"],
     "paths": {
       "@robocode-packages/config": ["../../packages/config/src/index.ts"],
-      "@robocode-packages/shared": ["../../packages/shared/src/index.ts"]
+      "@robocode-packages/shared": ["../../packages/shared/src/index.ts"],
+      "@services": ["./src/services/index.ts"],
+      "@helpers": ["./src/helpers/index.ts"]
     }
   },
   "include": ["src"]

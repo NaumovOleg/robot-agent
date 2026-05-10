@@ -9,6 +9,14 @@ export const ensureFile = (pathname: string, defaultContent = '') => {
   }
 };
 
+export const readFile = (pathname: string, defaultContent = '') => {
+  ensureDir(pathname);
+  if (!fs.existsSync(pathname)) {
+    fs.writeFileSync(pathname, defaultContent);
+  }
+  return fs.readFileSync(pathname, 'utf-8');
+};
+
 const ensureDir = (pathname: string) => {
   const dir = path.dirname(pathname);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -25,7 +33,7 @@ export const loadJsonFile = <T>(path: string): T | null => {
   }
 };
 
-export const saveJsonFile = <T>(content: T, pathname: string): void => {
+export const saveJsonFile = <T>(pathname: string, content: T): void => {
   ensureFile(pathname);
   return fs.writeFileSync(pathname, JSON.stringify(content));
 };
@@ -41,3 +49,8 @@ export const deleteDir = (pathname: string) =>
 export const renameFile = (oldPath: string, newPath: string) => fs.renameSync(oldPath, newPath);
 
 export const renameDir = (oldPath: string, newPath: string) => fs.renameSync(oldPath, newPath);
+
+export const writeFile = (pathname: string, content: string): void => {
+  ensureFile(pathname);
+  return fs.writeFileSync(pathname, content);
+};
