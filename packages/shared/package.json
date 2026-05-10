@@ -20,5 +20,8 @@
       "development": "./src/index.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
   }
 }

@@ -1,67 +1,46 @@
-import { useState } from 'react';
-import { render, Text } from 'ink';
-import { WelcomeScreen, LoginScreen, ProviderScreen } from './screens';
-import { CONFIG_PATH } from '@robocode-packages/config';
-import { RouterProvider } from '@providers';
+import { Box, Text, useInput } from 'ink';
+import { WelcomeScreen, ProfileScreen } from './screens';
+import { RouterProvider, ProfileProvider } from '@providers';
+import { useRouter, useProfile } from '@hooks';
+import { Navigation } from '@components';
 
-console.log(CONFIG_PATH);
+const Screen = () => {
+  const { route, navigate } = useRouter();
+  const { list, active } = useProfile();
 
-type Step = 'welcome' | 'login' | 'provider' | 'done';
+  const profiles = list();
+  const activeProfile = profiles.length > 0 ? active() : null;
 
-const App = () => {
-  const [step, setStep] = useState<Step>('welcome');
-  const [apiKey, setApiKey] = useState('');
+  if (route === 'chat' && !activeProfile) {
+    navigate('welcome');
+    return null;
+  }
 
-  const isLoggedIn = Boolean(apiKey);
-
-  switch (step) {
+  switch (route) {
     case 'welcome':
-      return (
-        <WelcomeScreen
-          isLoggedIn={isLoggedIn}
-          onLogin={(key) => {
-            setApiKey(key);
-            setStep('provider');
-          }}
-          onContinue={() => setStep('login')}
-        />
-      );
-
-    case 'login':
-      return (
-        <LoginScreen
-          onSubmit={(key) => {
-            setApiKey(key);
-            setStep('provider');
-          }}
-        />
-      );
-
-    case 'provider':
-      return (
-        <ProviderScreen
-          onSelect={(item) => {
-            saveConfig({ apiKey, provider: item.value });
-            setStep('done');
-          }}
-        />
-      );
-
-    case 'done':
-      return <Text>✅ Setup complete. Run: robot-agent chat</Text>;
-
+      return <WelcomeScreen key="welcome" />;
+    case 'profile':
+      return <ProfileScreen key="profile" />;
     default:
       return <Text>Loading...</Text>;
   }
 };
 
-export const APP = render(
+const App = () => {
+  return (
+    <Box flexDirection="column" height="100%">
+      <Box flexGrow={1}>
+        <Screen />
+      </Box>
+      <Navigation />
+    </Box>
+  );
+};
+
+export const APP = (
   <RouterProvider>
-    <App />
-  </RouterProvider>,
-  {
-    stdin: process.stdin,
-    stdout: process.stdout,
-    exitOnCtrlC: true,
-  }
+    <ProfileProvider>
+      <App />
+    </ProfileProvider>
+  </RouterProvider>
 );

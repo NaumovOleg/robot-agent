@@ -18,6 +18,7 @@
       "@screens": ["./src/screens/index.ts"],
       "@types": ["./src/types/index.ts"],
       "@components": ["./src/components/index.ts"],
+      "@elements": ["./src/elements/index.ts"],
       "@robocode-packages/agent": ["../../packages/agent/src/index.ts"],
       "@robocode-packages/config": ["../../packages/config/src/index.ts"],
       "@robocode-packages/core": ["../../packages/core/src/index.ts"],

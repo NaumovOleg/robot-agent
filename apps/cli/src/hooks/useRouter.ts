@@ -1,7 +1,5 @@
-import { createContext, useContext } from 'react';
-import type { RouterState } from '@types';
-
-export const RouterContext = createContext<RouterState | null>(null);
+import { useContext } from 'react';
+import { RouterContext } from '@providers';
 
 export const useRouter = () => {
   const ctx = useContext(RouterContext);

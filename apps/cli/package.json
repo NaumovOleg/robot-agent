@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "chokidar 'src/**/*.{ts,tsx}' '../../packages/*/src/**/*.{ts,tsx}' -c 'tsx -r tsconfig-paths/register src/index.ts' --initial --debounce 500",
+    "dev": "chokidar 'src/**/*.{ts,tsx}' '../../packages/*/src/**/*.{ts,tsx}' -c 'tput reset && tsx -r tsconfig-paths/register src/index.ts' --initial --debounce 500",
     "build": "tsup",
     "start": "node dist/index.js",
     "prepublishOnly": "pnpm run build"

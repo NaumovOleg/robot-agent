@@ -1,8 +1,13 @@
-export type Route = 'welcome' | 'login' | 'chat' | 'settings';
+export type Route = 'welcome' | 'profile' | 'assistant' | 'settings';
+export enum Routes {
+  'welcome' = 'welcome',
+  'profile' = 'profile',
+  'assistant' = 'assistant',
+  'settings' = 'settings',
+}
 
 export interface RouterState {
   route: Route;
-  push: (route: Route) => void;
-
+  navigate: (route: Route) => void;
   back: () => void;
 }

@@ -12,14 +12,14 @@ export const RouterProvider: React.FC<Props> = ({ children }) => {
 
   const route = history.at(-1) ?? 'welcome';
 
-  const push = (next: Route) => setHistory((prev) => [...prev, next]);
+  const navigate = (next: Route) => setHistory((prev) => [...prev, next]);
 
   const back = () => setHistory((prev) => (prev.length <= 1 ? prev : prev.slice(0, -1)));
 
   const value = useMemo(
     () => ({
       route,
-      push,
+      navigate,
       back,
     }),
     [route]
