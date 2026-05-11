@@ -1,22 +1,22 @@
-import type { BaseMessage } from '@langchain/core/messages';
-import { FileSystem, sessionMdPath, messageType } from '@robocode-packages/shared';
-import type { Session, SessionMeta } from '@robocode-packages/shared';
+import { FileSystem, sessionMdPath } from '@robocode-packages/shared';
+import type { Session } from '@robocode-packages/shared';
 import { SESSION_INDEX_PATH } from '@robocode-packages/config';
-import { writeMessagesToFile, readMessagesFromFile } from '../helpers';
+import { writeMessagesToFile } from '../helpers';
 
 export class SessionService {
   static active: Session | null = null;
-  messages: BaseMessage[] = [];
-  static list(): SessionMeta[] {
-    return FileSystem.loadJson<SessionMeta[]>(SESSION_INDEX_PATH) ?? [];
+  static list(): Session[] {
+    const sessions = FileSystem.loadJson<Session[]>(SESSION_INDEX_PATH) ?? [];
+    this.active = this.active ?? sessions.find((s) => s.active) ?? null;
+
+    return sessions;
   }
 
   static load(id: string): Session | null {
     const index = this.list();
-    const meta = index.find((m) => m.id === id);
-    if (!meta) return null;
-    const messages = readMessagesFromFile(id);
-    return { meta, messages };
+    const session = index.find((m) => m.id === id);
+    if (!session) return null;
+    return session;
   }
 
   static set(id: string | null) {
@@ -28,17 +28,14 @@ export class SessionService {
     const meta = list.find((el) => el.id === id);
     if (!meta) return;
     meta.active = true;
-    this.active = {
-      meta,
-      messages: this.getMessages(meta.id),
-    };
+    this.active = meta;
     this.updateIndex(meta);
   }
 
   static create(): Session {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const meta: SessionMeta = {
+    const session: Session = {
       id,
       name: `Session ${new Date().toLocaleDateString()}`,
       createdAt: now,
@@ -48,34 +45,8 @@ export class SessionService {
     };
 
     writeMessagesToFile(id, []);
-    this.updateIndex(meta);
-    return { meta, messages: [] };
-  }
-
-  static addMessage(id: string, message: BaseMessage): Session {
-    const session = this.load(id);
-    if (!session) throw new Error(`Session ${id} not found`);
-
-    session.messages.push(message);
-    session.meta.messageCount = session.messages.length;
-    session.meta.updatedAt = new Date().toISOString();
-
-    if (session.messages.length === 1 && messageType(message) === 'human') {
-      const content =
-        typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-      session.meta.name = content.slice(0, 40) + (content.length > 40 ? '...' : '');
-    }
-
-    writeMessagesToFile(id, session.messages);
-
-    this.updateIndex(session.meta);
-    this.active?.messages?.push(message);
-
+    this.updateIndex(session);
     return session;
-  }
-
-  static getMessages(id: string) {
-    return [];
   }
 
   static rename(id: string, name: string): void {
@@ -95,19 +66,19 @@ export class SessionService {
 
   static clear(id: string): Session {
     const index = this.list();
-    const meta = index.find((m) => m.id === id);
-    if (!meta) throw new Error(`Session ${id} not found`);
+    const session = index.find((m) => m.id === id);
+    if (!session) throw new Error(`Session ${id} not found`);
     writeMessagesToFile(id, []);
-    meta.messageCount = 0;
-    meta.updatedAt = new Date().toISOString();
-    this.updateIndex(meta);
+    session.messageCount = 0;
+    session.updatedAt = new Date().toISOString();
+    this.updateIndex(session);
     if (id === this.active?.id) {
       this.active = null;
     }
-    return { meta, messages: [] };
+    return session;
   }
 
-  private static updateIndex(updatedMeta: SessionMeta): void {
+  private static updateIndex(updatedMeta: Session): void {
     let index = this.list();
     const existingIdx = index.findIndex((m) => m.id === updatedMeta.id);
     if (existingIdx >= 0) {

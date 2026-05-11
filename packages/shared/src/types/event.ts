@@ -1,0 +1,19 @@
+import type { PendingToolCall } from '@types';
+export interface AppEvents {
+  'user:message': { sessionId: string; content: string };
+  'user:stop': { sessionId: string };
+
+  'llm:token': { sessionId: string; token: string };
+  'llm:thinking': { sessionId: string; text: string };
+  'llm:start': { sessionId: string };
+  'llm:end': { sessionId: string };
+  'llm:error': { sessionId: string; error: string };
+
+  'agent:plan': { sessionId: string; plan: { goal: string; steps: string[] } };
+  'agent:tool_pending': { sessionId: string; toolCall: PendingToolCall };
+  'agent:tool_decision': { sessionId: string; approved: boolean; toolCall: PendingToolCall };
+
+  'tool:start': { sessionId: string; name: string; input: unknown };
+  'tool:end': { sessionId: string; name: string; output: unknown };
+  'tool:error': { sessionId: string; name: string; error: string };
+}

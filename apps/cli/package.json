@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
+    "@langchain/core": "1.1.45",
     "@robocode-packages/agent": "workspace:*",
     "@robocode-packages/config": "workspace:*",
     "@robocode-packages/core": "workspace:*",

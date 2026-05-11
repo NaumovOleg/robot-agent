@@ -1,15 +1,8 @@
-import type { BaseMessage } from '@langchain/core/messages';
-
-export interface SessionMeta {
+export interface Session {
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
   messageCount: number;
   active: boolean;
-}
-
-export interface Session {
-  meta: SessionMeta;
-  messages: BaseMessage[];
 }

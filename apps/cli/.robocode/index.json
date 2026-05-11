@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ea9c3d29-21d4-4ec2-a25f-7e36c1036618",
+    "name": "Session 5/11/2026",
+    "createdAt": "2026-05-11T07:59:30.674Z",
+    "updatedAt": "2026-05-11T07:59:30.674Z",
+    "messageCount": 0,
+    "active": true
+  },
+  {
+    "id": "91448ee1-adf7-4fc0-8240-e6775c98563f",
+    "name": "Session 5/11/2026",
+    "createdAt": "2026-05-11T06:29:35.301Z",
+    "updatedAt": "2026-05-11T06:29:35.301Z",
+    "messageCount": 0,
+    "active": false
+  }
+]

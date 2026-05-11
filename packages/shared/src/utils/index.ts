@@ -3,3 +3,4 @@ export * from './paths';
 export * from './message';
 export * from './session';
 export * from './debug';
+export * from './async';

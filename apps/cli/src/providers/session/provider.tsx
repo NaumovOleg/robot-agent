@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { SessionService } from '@robocode-packages/core';
-import type { Session, SessionMeta } from '@robocode-packages/shared';
-import { toBaseMessage } from '@robocode-packages/shared';
+import type { Session } from '@robocode-packages/shared';
 import { SessionContext } from './ctx';
 
 interface Props {
@@ -9,17 +8,12 @@ interface Props {
 }
 
 export const SessionProvider: React.FC<Props> = ({ children }) => {
-  const [sessions, setSessions] = useState<SessionMeta[]>(() => SessionService.list());
-  const [active, setActiveSession] = useState<SessionMeta | null>(
-    () => SessionService.active?.meta ?? null
-  );
-  const [messages, setMessages] = useState<Session['messages']>(
-    () => SessionService.active?.messages ?? []
-  );
+  const [sessions, setSessions] = useState<Session[]>(() => SessionService.list());
+  const [active, setActive] = useState<Session | null>(() => SessionService.active ?? null);
 
   const refreshMeta = useCallback(() => {
     setSessions(SessionService.list());
-    setActiveSession(SessionService.active?.meta ?? null);
+    setActive(SessionService.active ?? null);
   }, []);
 
   const create = useCallback((): Session => {
@@ -28,9 +22,9 @@ export const SessionProvider: React.FC<Props> = ({ children }) => {
     return newSession;
   }, [refreshMeta]);
 
-  const setActive = useCallback((id: string | null) => {
+  const setActiveSession = useCallback((id: string | null) => {
     SessionService.set(id);
-    refreshMeta();
+    setSessions((list) => list.map((s) => ({ ...s, active: s.id === id })));
   }, []);
 
   const deleteSession = useCallback(
@@ -41,38 +35,24 @@ export const SessionProvider: React.FC<Props> = ({ children }) => {
         const nextMeta = sessions.find((m) => m.id !== id);
         if (nextMeta) {
           const nextSession = SessionService.load(nextMeta.id);
-          setActive(nextSession?.meta?.id ?? null);
+          setActive(nextSession ?? null);
         } else {
           setActive(null);
-          localStorage.removeItem('activeSessionId');
         }
       }
     },
     [active, sessions, refreshMeta]
   );
 
-  const addMessage = useCallback(
-    (msg: unknown) => {
-      if (!active) throw new Error('No active session');
-      const baseMsg = toBaseMessage(msg);
-      SessionService.addMessage(active.id, baseMsg);
-      refreshMeta();
-      setMessages((all) => all.concat(baseMsg));
-    },
-    [active, refreshMeta]
-  );
-
   const value = useMemo(
     () => ({
-      messages,
       create,
       delete: deleteSession,
-      set: setActive,
+      set: setActiveSession,
       active,
       list: sessions,
-      addMessage,
     }),
-    [active, create, deleteSession, setActive, active, sessions, addMessage]
+    [active, create, deleteSession, setActive, active, sessions]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

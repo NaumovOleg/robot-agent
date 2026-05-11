@@ -86,3 +86,25 @@ export function toBaseMessage(msg: unknown): BaseMessage {
   }
   throw new Error(`Cannot convert to BaseMessage: ${JSON.stringify(msg)}`);
 }
+
+export const parseMessages = (raw: string): BaseMessage[] => {
+  const blocks = raw.split(/\n---\n/).filter(Boolean);
+
+  return blocks.map(markdownToMessage).filter((el) => !!el);
+};
+
+export const serializeMessages = (messages: BaseMessage[]): string => {
+  return messages
+    .map((msg) => {
+      const role = messageType(msg);
+
+      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+
+      if (msg instanceof ToolMessage) {
+        return `## tool\n<!-- tool_call_id: ${msg.tool_call_id} -->\n${content}`;
+      }
+
+      return `## ${role}\n${content}`;
+    })
+    .join('\n---\n');
+};

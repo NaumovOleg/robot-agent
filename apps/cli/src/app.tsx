@@ -1,15 +1,23 @@
 import { Box, Text } from 'ink';
 import { WelcomeScreen, ProfileScreen, ChatScreen } from '@screens';
 import { RouterProvider, ProfileProvider, SessionProvider } from '@providers';
-import { useRouter, useProfile } from '@hooks';
+import { useRouter, useProfile, useSession } from '@hooks';
 import { Navigation } from '@components';
+import { useEffect } from 'react';
 
 const Screen = () => {
   const { route, navigate } = useRouter();
   const { list, active } = useProfile();
+  const { active: session } = useSession();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
+
+  useEffect(() => {
+    if (session && activeProfile) {
+      navigate('assistant');
+    }
+  }, [session]);
 
   if (route === 'assistant' && !activeProfile) {
     navigate('welcome');

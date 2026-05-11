@@ -1,8 +1,14 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist"
+    "rootDir": "../../",
+    "outDir": "./dist",
+    "types": ["node"],
+    "paths": {
+      "@robocode-packages/config": ["../../packages/config/src/index.ts"],
+      "@robocode-packages/shared": ["../../packages/shared/src/index.ts"],
+      "@utils": ["./src/utils/index.ts"]
+    }
   },
   "include": ["src"]
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { AI_PROVIDERS, PROVIDERS_LIST } from '@robocode-packages/config';
 import { useProfile, useRouter } from '@hooks';
-import { FormInput } from '@elements';
+import { FormInput, ConfirmDelete } from '@elements';
 import { debug } from '@robocode-packages/shared';
 
 type Step =
@@ -176,21 +176,7 @@ export const ProfileScreen: React.FC = () => {
         return;
       }
       if (key.return || input === ' ') {
-        handleDropdownSelect(DROPDOWN_ITEMS[dropdownIndex]!);
-        return;
-      }
-    }
-
-    if (step === 'confirm_delete') {
-      if (key.escape || input === 'n' || input === 'N') {
-        setStep('dropdown');
-        return;
-      }
-      if (input === 'y' || input === 'Y') {
-        del(targetId);
-        setSelectedIndex(0);
-        setTargetId('');
-        setStep('list');
+        handleDropdownSelect(DROPDOWN_ITEMS[dropdownIndex]);
         return;
       }
     }
@@ -306,32 +292,20 @@ export const ProfileScreen: React.FC = () => {
 
   if (step === 'confirm_delete') {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Box marginBottom={1}>
-          <Text color="red" bold>
-            Delete profile
-          </Text>
-        </Box>
-
-        <Box marginBottom={1}>
-          <Text>Delete </Text>
-          <Text color="white" bold>
-            {targetProfile?.name}
-          </Text>
-          <Text>? This cannot be undone.</Text>
-        </Box>
-
-        <Box gap={3}>
-          <Text color="red" bold>
-            Y yes, delete
-          </Text>
-          <Text color="gray">N cancel</Text>
-        </Box>
-
-        <Box marginTop={1}>
-          <Text dimColor>press Y or N ESC = cancel</Text>
-        </Box>
-      </Box>
+      <ConfirmDelete
+        display={step === 'confirm_delete'}
+        name={targetProfile?.name ?? ''}
+        title="Delete profile"
+        confirm={() => {
+          del(targetId);
+          setSelectedIndex(0);
+          setTargetId('');
+          setStep('list');
+        }}
+        cancel={() => {
+          setStep('dropdown');
+        }}
+      />
     );
   }
 

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useRouter, useProfile, useSession } from '@hooks';
+import { useRouter, useProfile } from '@hooks';
+import { SessionList } from '@components';
 
 const ROBOT_LOGO = [
   '  ╦═╗╔═╗╔╗ ╔═╗╔═╗╔═╗╔╦╗╔═╗',
@@ -8,18 +9,12 @@ const ROBOT_LOGO = [
   '  ╩╚═╚═╝╚═╝╚═╝╚═╝╚═╝═╩╝╚═╝',
 ];
 
-const NEW_SESSION = '+ new session';
-
 export const WelcomeScreen: React.FC = () => {
   const { list, active } = useProfile();
   const { navigate } = useRouter();
-  const { list: sessions, create, set: setSession } = useSession();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
-
-  const sessionItems = [...sessions.map((s) => s.name), NEW_SESSION];
-  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((input, key) => {
     if (!activeProfile) {
@@ -31,37 +26,11 @@ export const WelcomeScreen: React.FC = () => {
         navigate('assistant');
         return;
       }
-      return;
-    }
-
-    if (key.downArrow) {
-      setSelectedIndex((i) => Math.min(i + 1, sessionItems.length - 1));
-      return;
-    }
-    if (key.upArrow) {
-      setSelectedIndex((i) => Math.max(i - 1, 0));
-      return;
-    }
-
-    if (input === ' ' || key.return) {
-      const selected = sessionItems[selectedIndex];
-      if (selected === NEW_SESSION) {
-        create();
-        navigate('assistant');
-      } else {
-        const session = sessions.find((s) => s.name === selected);
-        if (session) {
-          setSession(session.id);
-          navigate('assistant');
-        }
-      }
-      return;
     }
   });
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
-      {/* LOGO */}
       <Box flexDirection="column" marginBottom={1}>
         {ROBOT_LOGO.map((line, i) => (
           <Text key={i} color={i === 0 ? 'blueBright' : i === 1 ? 'blue' : 'blueBright'}>
@@ -70,12 +39,10 @@ export const WelcomeScreen: React.FC = () => {
         ))}
       </Box>
 
-      {/* SUBTITLE */}
       <Box marginBottom={1}>
         <Text color="gray"> AI code assistant</Text>
       </Box>
 
-      {/* STATUS */}
       <Box flexDirection="column" marginBottom={1}>
         <Text color={activeProfile ? 'green' : 'yellow'}>
           {'  '}● {activeProfile ? `connected as ${activeProfile.name}` : 'no active profile'}
@@ -88,7 +55,6 @@ export const WelcomeScreen: React.FC = () => {
         )}
       </Box>
 
-      {/* DIVIDER */}
       <Box marginBottom={1}>
         <Text color="gray">
           {'  '}
@@ -96,7 +62,6 @@ export const WelcomeScreen: React.FC = () => {
         </Text>
       </Box>
 
-      {/* NO PROFILE */}
       {!activeProfile ? (
         <Box flexDirection="column" gap={1}>
           <Box flexDirection="column">
@@ -123,31 +88,7 @@ export const WelcomeScreen: React.FC = () => {
             <Text color="gray">choose a session or start new</Text>
           </Box>
 
-          <Box flexDirection="column">
-            {sessionItems.map((item, i) => {
-              const isSelected = i === selectedIndex;
-              const isNew = item === NEW_SESSION;
-
-              return (
-                <Box key={item} paddingLeft={2}>
-                  <Text color={isSelected ? 'blueBright' : 'white'}>
-                    {isSelected ? '▶ ' : '  '}
-                  </Text>
-                  <Text
-                    color={isNew ? 'green' : isSelected ? 'blueBright' : 'white'}
-                    bold={isNew}
-                    dimColor={!isSelected && !isNew}
-                  >
-                    {item}
-                  </Text>
-                </Box>
-              );
-            })}
-          </Box>
-
-          <Box paddingLeft={2} marginTop={1}>
-            <Text dimColor>↑↓ navigate ENTER = open TAB = switch page</Text>
-          </Box>
+          <SessionList />
         </Box>
       )}
     </Box>
