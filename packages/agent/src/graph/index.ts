@@ -1,8 +1,7 @@
 import { StateGraph, END, START, MemorySaver } from '@langchain/langgraph';
-
 import { AgentState } from '../state';
-import { plannerNode, agentNode, toolApprovalNode, toolsNode } from '@nodes';
-import { shouldContinue, afterApproval } from '@utils';
+import { plannerNode, agentNode, toolApprovalNode, toolsNode } from '../nodes';
+import { shouldContinue, afterApproval } from '../utils';
 
 export const buildGraph = () => {
   const checkpointer = new MemorySaver();

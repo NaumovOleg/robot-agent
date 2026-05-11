@@ -1,8 +1,8 @@
-import { getModel } from '@utils';
+import { getModel } from '../utils';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { interrupt } from '@langchain/langgraph';
 import { EventBus } from '@robocode-packages/core';
-import { PLANNER_PROMPT } from '@prompts';
+import { PLANNER_PROMPT } from '../prompts';
 import type { AgentStateType } from '../state';
 
 export const plannerNode = async (state: AgentStateType) => {

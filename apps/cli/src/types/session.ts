@@ -4,6 +4,6 @@ export interface SessionState {
   create: () => Session;
   delete: (id: string) => void;
   set: (id: string) => void;
-  active: Session | null;
+  session: Session | null;
   list: Session[];
 }

@@ -12,8 +12,14 @@
     "@langchain/core": "^1.1.45",
     "@langchain/langgraph": "^1.3.0",
     "@langchain/openai": "^1.4.5",
-    "@robocode-packages/core": "workspace:../core",
     "zod": "^3.22.4"
+  },
+  "peerDependencies": {
+    "@robocode-packages/core": "workspace:../core",
+    "@robocode-packages/config": "workspace:../config",
+    "@robocode-packages/tools": "workspace:../tools",
+    "@robocode-packages/shared": "workspace:../shared",
+    "@robocode-packages/providers": "workspace:../providers"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -1,9 +1,9 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { EventBus } from '@robocode-packages/core';
-import { SYSTEM_PROMPT } from '@prompts';
 import type { AgentStateType } from '../state';
 import { MAX_AGENT_ITERATIONS } from '@robocode-packages/config';
-import { getModel } from '@utils';
+import { getModel } from '../utils';
+import { SYSTEM_PROMPT } from '../prompts';
 
 export const agentNode = async (state: AgentStateType) => {
   const { sessionId, iterationCount } = state;

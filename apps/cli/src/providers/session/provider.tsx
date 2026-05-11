@@ -9,11 +9,11 @@ interface Props {
 
 export const SessionProvider: React.FC<Props> = ({ children }) => {
   const [sessions, setSessions] = useState<Session[]>(() => SessionService.list());
-  const [active, setActive] = useState<Session | null>(() => SessionService.active ?? null);
+  const [session, setSession] = useState<Session | null>(() => SessionService.active ?? null);
 
   const refreshMeta = useCallback(() => {
     setSessions(SessionService.list());
-    setActive(SessionService.active ?? null);
+    setSession(SessionService.active ?? null);
   }, []);
 
   const create = useCallback((): Session => {
@@ -31,17 +31,17 @@ export const SessionProvider: React.FC<Props> = ({ children }) => {
     (id: string) => {
       SessionService.delete(id);
       refreshMeta();
-      if (active?.id === id) {
+      if (session?.id === id) {
         const nextMeta = sessions.find((m) => m.id !== id);
         if (nextMeta) {
           const nextSession = SessionService.load(nextMeta.id);
-          setActive(nextSession ?? null);
+          setSession(nextSession ?? null);
         } else {
-          setActive(null);
+          setSession(null);
         }
       }
     },
-    [active, sessions, refreshMeta]
+    [session, sessions, refreshMeta]
   );
 
   const value = useMemo(
@@ -49,10 +49,10 @@ export const SessionProvider: React.FC<Props> = ({ children }) => {
       create,
       delete: deleteSession,
       set: setActiveSession,
-      active,
+      session,
       list: sessions,
     }),
-    [active, create, deleteSession, setActive, active, sessions]
+    [session, create, deleteSession, setSession, sessions]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

@@ -154,9 +154,21 @@ importers:
       '@langchain/openai':
         specifier: ^1.4.5
         version: 1.4.5(@langchain/core@1.1.45(openai@6.37.0(ws@8.20.0)(zod@3.25.76))(ws@8.20.0))(ws@8.20.0)
+      '@robocode-packages/config':
+        specifier: workspace:../config
+        version: link:../config
       '@robocode-packages/core':
         specifier: workspace:../core
         version: link:../core
+      '@robocode-packages/providers':
+        specifier: workspace:../providers
+        version: link:../providers
+      '@robocode-packages/shared':
+        specifier: workspace:../shared
+        version: link:../shared
+      '@robocode-packages/tools':
+        specifier: workspace:../tools
+        version: link:../tools
       zod:
         specifier: ^3.22.4
         version: 3.25.76

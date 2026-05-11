@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 const Screen = () => {
   const { route, navigate } = useRouter();
   const { list, active } = useProfile();
-  const { active: session } = useSession();
+  const { session } = useSession();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;

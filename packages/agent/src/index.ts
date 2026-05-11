@@ -10,9 +10,8 @@ export const runAgent = async (sessionId: string, userInput: string) => {
   MessageService.add(sessionId, userMessage);
 
   const history = MessageService.load(sessionId);
-
   const result = await agent.invoke({ messages: history, sessionId }, config);
-  console.log(result);
+
   return result;
 };
 
