@@ -21,13 +21,9 @@ export const PROVIDERS_LIST = Object.values(AI_PROVIDERS);
 
 export enum API_KEYS {
   openai = 'openai:api-key',
+  anthropic = 'anthropic:api-key',
+  google = 'google:api-key',
+  openrouter = 'openrouter:api-key',
+  groq = 'groq:api-key',
+  ollama = 'ollama:api-key',
 }
-
-export const TOOL_RISK: Record<string, 'safe' | 'moderate' | 'destructive'> = {
-  bash: 'destructive',
-  write_file: 'destructive',
-  edit_file: 'moderate',
-  read_file: 'safe',
-};
-
-export const MAX_AGENT_ITERATIONS = 20;

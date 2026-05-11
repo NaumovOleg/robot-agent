@@ -1,4 +1,5 @@
-import type { PendingToolCall } from '@types';
+import type { PendingToolCall, Plan } from '@types';
+
 export interface AppEvents {
   'user:message': { sessionId: string; content: string };
   'user:stop': { sessionId: string };
@@ -10,10 +11,17 @@ export interface AppEvents {
   'llm:error': { sessionId: string; error: string };
 
   'agent:plan': { sessionId: string; plan: { goal: string; steps: string[] } };
+  'agent:plan_pending': { sessionId: string; plan: Plan | null };
+  'agent:plan_decision': {
+    sessionId: string;
+    approved: boolean;
+    plan: Plan | null;
+  };
   'agent:tool_pending': { sessionId: string; toolCall: PendingToolCall };
   'agent:tool_decision': { sessionId: string; approved: boolean; toolCall: PendingToolCall };
+  'agent:stopped': { sessionId: string };
 
-  'tool:start': { sessionId: string; name: string; input: unknown };
-  'tool:end': { sessionId: string; name: string; output: unknown };
-  'tool:error': { sessionId: string; name: string; error: string };
+  'tool:start': { sessionId: string; name: string; input: unknown; callId: string };
+  'tool:end': { sessionId: string; name: string; output: unknown; callId: string };
+  'tool:error': { sessionId: string; name: string; error: string; callId: string };
 }

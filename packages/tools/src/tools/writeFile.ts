@@ -2,13 +2,21 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { RunnableConfig } from '@langchain/core/runnables';
+import { ContextService } from '@robocode-packages/core';
 
 export const writeFileTool = tool(
-  async ({ path: filePath, content }) => {
+  async ({ path: filePath, content }, config?: RunnableConfig) => {
+    const cwd = (config?.configurable?.cwd as string) ?? process.cwd();
+    const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath);
+
     try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, content, 'utf-8');
-      return `Written: ${filePath}`;
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.writeFileSync(targetPath, content, 'utf-8');
+
+      ContextService.invalidateAfterWrite(targetPath);
+
+      return `Written: ${targetPath}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       return `Error: ${err.message}`;
@@ -16,7 +24,7 @@ export const writeFileTool = tool(
   },
   {
     name: 'write_file',
-    description: 'Write or overwrite a file with new content',
+    description: 'Create or overwrite a file with new content',
     schema: z.object({
       path: z.string().describe('Path to the file'),
       content: z.string().describe('Full file content to write'),

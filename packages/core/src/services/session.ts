@@ -32,7 +32,7 @@ export class SessionService {
     this.updateIndex(meta);
   }
 
-  static create(): Session {
+  static create(cwd?: string): Session {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const session: Session = {
@@ -42,6 +42,7 @@ export class SessionService {
       updatedAt: now,
       messageCount: 0,
       active: true,
+      cwd: cwd ?? process.cwd(),
     };
 
     writeMessagesToFile(id, []);
@@ -90,5 +91,14 @@ export class SessionService {
       index = index.map((el) => ({ ...el, active: el.id === updatedMeta.id }));
     }
     FileSystem.writeJson(SESSION_INDEX_PATH, index);
+  }
+
+  static updateMessageCount(sessionId: string, count: number): void {
+    const index = this.list();
+    const meta = index.find((s) => s.id === sessionId);
+    if (!meta) return;
+    meta.messageCount = count;
+    meta.updatedAt = new Date().toISOString();
+    this.updateIndex(meta);
   }
 }

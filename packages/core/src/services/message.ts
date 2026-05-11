@@ -1,17 +1,17 @@
 import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 import {
   FileSystem,
-  sessionMdPath,
-  parseMessages,
+  deserializeMessages,
+  sessionJsonPath,
   serializeMessages,
 } from '@robocode-packages/shared';
 
 export class MessageService {
   static load(sessionId: string): BaseMessage[] {
     try {
-      const raw = FileSystem.readFile(sessionMdPath(sessionId));
+      const raw = FileSystem.readFile(sessionJsonPath(sessionId));
       if (!raw) return [];
-      return parseMessages(raw);
+      return deserializeMessages(raw);
     } catch {
       return [];
     }
@@ -19,13 +19,13 @@ export class MessageService {
 
   static save(sessionId: string, messages: BaseMessage[]): void {
     const content = serializeMessages(messages);
-    FileSystem.writeFile(sessionMdPath(sessionId), content);
+    FileSystem.writeFile(sessionJsonPath(sessionId), content);
   }
 
   static add(sessionId: string, message: BaseMessage | string): BaseMessage[] {
     const msg = typeof message === 'string' ? new HumanMessage(message) : message;
-
     const messages = this.load(sessionId);
+
     messages.push(msg);
     this.save(sessionId, messages);
     return messages;

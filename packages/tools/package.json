@@ -9,11 +9,13 @@
   },
   "dependencies": {
     "@langchain/core": "^1.1.45",
+    "glob": "^13.0.6",
     "zod": "^3.22.4"
   },
   "peerDependencies": {
     "@robocode-packages/config": "workspace:*",
-    "@robocode-packages/shared": "workspace:*"
+    "@robocode-packages/shared": "workspace:*",
+    "@robocode-packages/core": "workspace:*"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,5 +24,8 @@
       "development": "./src/index.ts",
       "default": "./dist/index.js"
     }
+  },
+  "devDependencies": {
+    "@types/glob": "^9.0.0"
   }
 }

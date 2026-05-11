@@ -27,6 +27,14 @@ export const AgentState = Annotation.Root({
     reducer: (_, n) => n,
     default: () => 0,
   }),
+  planApproved: Annotation<boolean>({
+    reducer: (_, n) => n ?? false,
+    default: () => false,
+  }),
+  cwd: Annotation<string>({
+    reducer: (_, n) => n,
+    default: () => process.cwd(),
+  }),
 });
 
 export type AgentStateType = typeof AgentState.State;

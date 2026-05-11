@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT_DIR } from '@robocode-packages/config';
 import { ensureFile } from './fs';
 
-const LOG_PATH = path.join(ROOT_DIR, './debug.log');
+const LOG_PATH = path.join('.robocode', './debug.log');
 
 export const debug = (...args: unknown[]) => {
   ensureFile(LOG_PATH);

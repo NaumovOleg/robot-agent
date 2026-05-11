@@ -5,27 +5,29 @@ import TextInput from 'ink-text-input';
 interface Props {
   onSubmit: (value: string) => void;
   isLoading?: boolean;
+  isActive?: boolean;
 }
 
-export const ChatInput: React.FC<Props> = ({ onSubmit, isLoading }) => {
+export const ChatInput: React.FC<Props> = ({ onSubmit, isLoading, isActive }) => {
   const [value, setValue] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  useInput((_, key) => {
-    if (key.upArrow && history.length > 0) {
-      const next = Math.min(historyIndex + 1, history.length - 1);
-      setHistoryIndex(next);
-      setValue(history[next] ?? '');
-      return;
-    }
-    if (key.downArrow && historyIndex >= 0) {
-      const next = historyIndex - 1;
-      setHistoryIndex(next);
-      setValue(next < 0 ? '' : (history[next] ?? ''));
-      return;
-    }
-  });
+  useInput(
+    (_, key) => {
+      if (key.upArrow && history.length > 0) {
+        const next = Math.min(historyIndex + 1, history.length - 1);
+        setHistoryIndex(next);
+        setValue(history[next] ?? '');
+      }
+      if (key.downArrow && historyIndex >= 0) {
+        const next = historyIndex - 1;
+        setHistoryIndex(next);
+        setValue(next < 0 ? '' : (history[next] ?? ''));
+      }
+    },
+    { isActive }
+  );
 
   const handleSubmit = (v: string) => {
     const trimmed = v.trim();

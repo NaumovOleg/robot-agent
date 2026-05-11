@@ -1,10 +1,1 @@
-[
-  {
-    "id": "ea9c3d29-21d4-4ec2-a25f-7e36c1036618",
-    "name": "Session 5/11/2026",
-    "createdAt": "2026-05-11T07:59:30.674Z",
-    "updatedAt": "2026-05-11T07:59:30.674Z",
-    "messageCount": 0,
-    "active": true
-  }
-]
+[{"id":"3fc867b4-a7a5-4d8e-a320-9642723dfbf8","name":"Session 5/12/2026","createdAt":"2026-05-12T14:25:26.140Z","updatedAt":"2026-05-13T10:08:10.491Z","messageCount":49,"active":true,"cwd":"/Users/oleg/Documents/projects/robocode-cli/apps/cli"}]

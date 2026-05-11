@@ -4,3 +4,7 @@ export * from './message';
 export * from './session';
 export * from './debug';
 export * from './async';
+export * from './helpers';
+export * from './detectLanguage';
+export * from './git';
+export * from './code';

@@ -1,22 +1,26 @@
-import { SystemMessage } from '@langchain/core/messages';
+import { SystemMessage, AIMessage } from '@langchain/core/messages';
 import { EventBus } from '@robocode-packages/core';
 import type { AgentStateType } from '../state';
 import { MAX_AGENT_ITERATIONS } from '@robocode-packages/config';
 import { getModel } from '../utils';
-import { SYSTEM_PROMPT } from '../prompts';
+import { buildSystemPrompt } from '../prompts';
+import { compressHistoryJson } from '../context/compressor';
 
 export const agentNode = async (state: AgentStateType) => {
-  const { sessionId, iterationCount } = state;
+  const { sessionId, iterationCount, cwd } = state;
 
   if (iterationCount >= MAX_AGENT_ITERATIONS) {
     EventBus.emit('llm:error', { sessionId, error: 'Max iterations reached' });
-    return {};
+    return { messages: [new AIMessage('Max iterations reached. Stopping.')] };
   }
 
   EventBus.emit('llm:start', { sessionId });
 
-  const model = getModel(true);
-  const response = await model.invoke([new SystemMessage(SYSTEM_PROMPT), ...state.messages], {
+  const systemPrompt = await buildSystemPrompt(cwd);
+  const model = getModel(true, cwd);
+  const compressedMessages = await compressHistoryJson(state, model);
+
+  const response = await model.invoke([new SystemMessage(systemPrompt), ...compressedMessages], {
     callbacks: [
       {
         handleLLMNewToken(token: string) {

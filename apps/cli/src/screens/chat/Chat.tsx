@@ -1,79 +1,142 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useRouter, useSession } from '@hooks';
+import { useSession, useRouter } from '@hooks';
 import { ChatInput } from '@elements';
 import { EventBus, MessageService } from '@robocode-packages/core';
-import { runAgent, resumeAgent } from '@robocode-packages/agent';
+import { runAgent, resumeAgent, stopAgent } from '@robocode-packages/agent';
 import { BaseMessage, AIMessage, HumanMessage } from '@langchain/core/messages';
-import { messageType } from '@robocode-packages/shared';
+import { messageType, Plan, PendingToolCall } from '@robocode-packages/shared';
 import { ROLE_LABELS, ROLE_COLORS } from '@types';
+import {
+  PendingPlan,
+  PendingTool,
+  ActivityFeed,
+  AgentStatus,
+  type ToolActivity,
+} from './components';
 
 export const ChatScreen: React.FC = () => {
-  const { navigate } = useRouter();
   const { session } = useSession();
+  const { navigate } = useRouter();
+
   const [messages, setMessages] = useState<BaseMessage[]>(() =>
     session ? MessageService.load(session.id) : []
   );
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  const [pendingTool, setPendingTool] = useState<any>(null);
-  const [plan, setPlan] = useState<any>(null);
-  const [selectedAction, setSelectedAction] = useState<'approve' | 'reject'>('approve');
+  const [pendingTool, setPendingTool] = useState<PendingToolCall | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<Plan | null>(null);
+  const [activities, setActivities] = useState<ToolActivity[]>([]);
+  const [elapsed, setElapsed] = useState(0);
 
+  const streamingRef = useRef('');
+  const agentStartTimeRef = useRef<number | null>(null);
+
+  // Reset on session change
   useEffect(() => {
-    if (session) {
-      const loaded = MessageService.load(session.id);
-      setMessages(loaded);
-      setStreamingText('');
-      setPendingTool(null);
-      setPlan(null);
-      setIsLoading(false);
-      setSelectedAction('approve');
-    }
-  }, [session]);
-
-  useEffect(() => {
-    const unsubscribePlan = EventBus.on('agent:plan', ({ plan: planData }) => {
-      setPlan(planData);
-      setSelectedAction('approve');
-    });
-    const unsubscribeTool = EventBus.on('agent:tool_pending', ({ toolCall }) => {
-      setPendingTool(toolCall);
-      setSelectedAction('approve');
-    });
-    const unsubscribeToken = EventBus.on(
-      'llm:token',
-      ({ sessionId, token }: { sessionId: string; token: string }) => {
-        if (sessionId !== session?.id) return;
-        setStreamingText((prev) => prev + token);
-      }
-    );
-    const unsubscribeEnd = EventBus.on('llm:end', ({ sessionId }: { sessionId: string }) => {
-      if (sessionId !== session?.id) return;
-      if (streamingText) {
-        const aiMessage = new AIMessage(streamingText);
-        MessageService.add(session.id, aiMessage);
-        setMessages((prev) => [...prev, aiMessage]);
-        setStreamingText('');
-      }
-      setIsLoading(false);
-    });
-
-    return () => {
-      unsubscribePlan();
-      unsubscribeTool();
-      unsubscribeToken();
-      unsubscribeEnd();
-    };
-  }, [session?.id, streamingText]);
-
-  const handleSubmit = async (value: string) => {
     if (!session) return;
-    const userMessage = new HumanMessage(value);
-    MessageService.add(session.id, userMessage);
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
+    setMessages(MessageService.load(session.id));
     setStreamingText('');
+    streamingRef.current = '';
+    setPendingTool(null);
+    setPendingPlan(null);
+    setActivities([]);
+    setIsLoading(false);
+    agentStartTimeRef.current = null;
+    setElapsed(0);
+  }, [session?.id]);
+
+  // Event subscriptions — no stale closures: streaming text lives in a ref
+  useEffect(() => {
+    if (!session?.id) return;
+    const id = session.id;
+
+    const unsubs = [
+      EventBus.on('llm:start', ({ sessionId }) => {
+        if (sessionId !== id) return;
+        setIsLoading(true);
+      }),
+
+      EventBus.on('llm:token', ({ sessionId, token }) => {
+        if (sessionId !== id) return;
+        streamingRef.current += token;
+        setStreamingText((prev) => prev + token);
+      }),
+
+      EventBus.on('llm:end', ({ sessionId }) => {
+        if (sessionId !== id) return;
+        if (streamingRef.current) {
+          const msg = new AIMessage(streamingRef.current);
+          setMessages((prev) => [...prev, msg]);
+          streamingRef.current = '';
+          setStreamingText('');
+        }
+        setIsLoading(false);
+      }),
+
+      EventBus.on('llm:error', ({ sessionId }) => {
+        if (sessionId !== id) return;
+        streamingRef.current = '';
+        setStreamingText('');
+        setIsLoading(false);
+      }),
+
+      EventBus.on('agent:plan_pending', ({ plan }) => setPendingPlan(plan)),
+      EventBus.on('agent:plan_decision', () => setPendingPlan(null)),
+      EventBus.on('agent:tool_pending', ({ toolCall }) => setPendingTool(toolCall)),
+      EventBus.on('agent:tool_decision', () => setPendingTool(null)),
+
+      EventBus.on('tool:start', ({ sessionId, name, input, callId }) => {
+        if (sessionId !== id) return;
+        setActivities((prev) => [...prev, { id: callId, name, input, status: 'running' }]);
+      }),
+
+      EventBus.on('tool:end', ({ sessionId, callId }) => {
+        if (sessionId !== id) return;
+        setActivities((prev) => prev.map((a) => (a.id === callId ? { ...a, status: 'done' } : a)));
+      }),
+
+      EventBus.on('tool:error', ({ sessionId, callId }) => {
+        if (sessionId !== id) return;
+        setActivities((prev) => prev.map((a) => (a.id === callId ? { ...a, status: 'error' } : a)));
+      }),
+    ];
+
+    return () => unsubs.forEach((u) => u());
+  }, [session?.id]);
+
+  useInput((_, key) => {
+    if (key.escape) {
+      session?.id && stopAgent(session.id);
+      navigate('welcome');
+    }
+  });
+
+  const isBusy = isLoading || !!pendingTool || !!pendingPlan;
+
+  // Elapsed time tracking
+  useEffect(() => {
+    if (!isBusy) {
+      agentStartTimeRef.current = null;
+      setElapsed(0);
+      return;
+    }
+    if (agentStartTimeRef.current === null) {
+      agentStartTimeRef.current = Date.now();
+    }
+    const t = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - agentStartTimeRef.current!) / 1000));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [isBusy]);
+
+  const handleSubmit = (value: string) => {
+    if (!session) return;
+    setMessages((prev) => [...prev, new HumanMessage(value)]);
+    setIsLoading(true);
+    streamingRef.current = '';
+    setStreamingText('');
+    setActivities([]);
     runAgent(session.id, value);
   };
 
@@ -86,84 +149,36 @@ export const ChatScreen: React.FC = () => {
   const confirmPlan = (approved: boolean) => {
     if (!session) return;
     resumeAgent(session.id, approved ? 'approve' : 'reject');
-    setPlan(null);
+    setPendingPlan(null);
   };
 
-  useInput((input, key) => {
-    if (pendingTool || plan) {
-      if (key.downArrow || key.upArrow) {
-        setSelectedAction((prev) => (prev === 'approve' ? 'reject' : 'approve'));
-      } else if (key.return || input === ' ') {
-        if (pendingTool) confirmTool(selectedAction === 'approve');
-        if (plan) confirmPlan(selectedAction === 'approve');
-      } else if (key.escape) {
-        if (pendingTool) confirmTool(false);
-        if (plan) confirmPlan(false);
-      }
-      return;
+  // Hide tool messages and empty AI messages — tools are shown via ActivityFeed
+  const visibleMessages = messages.filter((msg) => {
+    const role = messageType(msg);
+    if (role === 'tool') return false;
+    if (role === 'ai') {
+      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      return content.trim().length > 0;
     }
-
-    if (key.escape) navigate('welcome');
+    return true;
   });
 
-  const renderToolPrompt = () => {
-    if (!pendingTool) return null;
-    return (
-      <Box flexDirection="column" marginY={1} padding={1} borderStyle="single" borderColor="yellow">
-        <Text color="yellow" bold>
-          Tool call requires approval:
-        </Text>
-        <Text>Name: {pendingTool.name}</Text>
-        <Text>Arguments: {JSON.stringify(pendingTool.args, null, 2)}</Text>
-        <Box marginTop={1} gap={2}>
-          <Text color={selectedAction === 'approve' ? 'greenBright' : 'green'}>
-            {selectedAction === 'approve' ? '▶' : ' '} ✓ Approve
-          </Text>
-          <Text color={selectedAction === 'reject' ? 'redBright' : 'red'}>
-            {selectedAction === 'reject' ? '▶' : ' '} ✗ Reject
-          </Text>
-        </Box>
-        <Text dimColor>↑/↓ select, Enter/Space confirm, Escape = reject</Text>
-      </Box>
-    );
-  };
-
-  const renderPlanPrompt = () => {
-    if (!plan) return null;
-    return (
-      <Box flexDirection="column" marginY={1} padding={1} borderStyle="single" borderColor="blue">
-        <Text color="blue" bold>
-          Agent plan:
-        </Text>
-        <Text>{plan.description || JSON.stringify(plan)}</Text>
-        <Box marginTop={1} gap={2}>
-          <Text color={selectedAction === 'approve' ? 'greenBright' : 'green'}>
-            {selectedAction === 'approve' ? '▶' : ' '} ✓ Execute plan
-          </Text>
-          <Text color={selectedAction === 'reject' ? 'redBright' : 'red'}>
-            {selectedAction === 'reject' ? '▶' : ' '} ✗ Cancel
-          </Text>
-        </Box>
-        <Text dimColor>↑/↓ select, Enter/Space confirm, Escape = cancel</Text>
-      </Box>
-    );
-  };
+  const runningTool = activities.find((a) => a.status === 'running')?.name ?? null;
 
   return (
     <Box flexDirection="column" height="100%">
-      {/* HEADER */}
-      <Box paddingX={2} paddingY={0} borderStyle="single" borderColor="gray">
+      {/* Header */}
+      <Box paddingX={2} borderStyle="single" borderColor="gray">
         <Text color="cyan" bold>
           robocode
         </Text>
         <Text color="gray"> / </Text>
         <Text color="white">{session?.name ?? 'new session'}</Text>
-        {isLoading && <Text color="yellow"> ⠋ thinking...</Text>}
       </Box>
 
-      {/* MESSAGES */}
+      {/* Conversation */}
       <Box flexDirection="column" flexGrow={1} paddingX={1} paddingY={1} overflowY="hidden">
-        {messages.map((msg, idx) => {
+        {visibleMessages.map((msg) => {
           const role = messageType(msg);
           const content =
             typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
@@ -174,48 +189,49 @@ export const ChatScreen: React.FC = () => {
                   {ROLE_LABELS[role] ?? role}
                 </Text>
                 <Box flexGrow={1} flexWrap="wrap">
-                  <Text
-                    color={role === 'human' ? 'white' : role === 'system' ? 'gray' : 'white'}
-                    dimColor={role === 'system' || role === 'tool'}
-                  >
-                    {content}
-                  </Text>
+                  <Text dimColor={role === 'system'}>{content}</Text>
                 </Box>
               </Box>
             </Box>
           );
         })}
 
-        {isLoading && streamingText && (
-          <Box gap={2} marginBottom={1}>
-            <Text color="cyan" bold>
-              ai
-            </Text>
-            <Text color="white">{streamingText}</Text>
-          </Box>
-        )}
-        {isLoading && !streamingText && (
-          <Box gap={2} marginBottom={1}>
-            <Text color="cyan" bold>
-              ai
-            </Text>
-            <Text color="gray">▋</Text>
+        {/* Streaming text */}
+        {streamingText && (
+          <Box flexDirection="column" marginBottom={1}>
+            <Box gap={2}>
+              <Text color={ROLE_COLORS['ai']} bold>
+                {ROLE_LABELS['ai']}
+              </Text>
+              <Box flexGrow={1} flexWrap="wrap">
+                <Text>{streamingText}</Text>
+              </Box>
+            </Box>
           </Box>
         )}
 
-        {renderToolPrompt()}
-        {renderPlanPrompt()}
+        {/* Live tool activity */}
+        <ActivityFeed activities={activities} />
+
+        {pendingTool && (
+          <PendingTool tool={pendingTool} isActive={!!pendingTool} confirm={confirmTool} />
+        )}
+        {pendingPlan && (
+          <PendingPlan isActive={!!pendingPlan} confirm={confirmPlan} plan={pendingPlan} />
+        )}
+
+        {isBusy && (
+          <AgentStatus
+            isThinking={isLoading}
+            runningTool={!isLoading ? runningTool : null}
+            elapsed={elapsed}
+          />
+        )}
       </Box>
 
-      {/* DIVIDER */}
-      <Box paddingX={2}>
-        <Text color="gray">{'─'.repeat(50)}</Text>
-      </Box>
-
+      {/* Input */}
       <Box paddingX={1} paddingY={1}>
-        <Box flexGrow={1}>
-          <ChatInput onSubmit={handleSubmit} isLoading={isLoading || !!pendingTool || !!plan} />
-        </Box>
+        <ChatInput isActive={!isBusy} onSubmit={handleSubmit} isLoading={isBusy} />
       </Box>
     </Box>
   );

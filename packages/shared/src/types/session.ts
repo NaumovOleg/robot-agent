@@ -5,4 +5,5 @@ export interface Session {
   updatedAt: string;
   messageCount: number;
   active: boolean;
+  cwd: string;
 }

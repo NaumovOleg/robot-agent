@@ -1,39 +1,69 @@
 import { getModel } from '../utils';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import { interrupt } from '@langchain/langgraph';
 import { EventBus } from '@robocode-packages/core';
-import { PLANNER_PROMPT } from '../prompts';
+import { debug } from '@robocode-packages/shared';
+import { buildPlannerPrompt } from '../prompts';
 import type { AgentStateType } from '../state';
-
 export const plannerNode = async (state: AgentStateType) => {
-  const { sessionId } = state;
+  const { sessionId, cwd } = state;
   const lastMessage = state.messages.at(-1);
   if (!lastMessage) return {};
 
-  const model = getModel(false);
-
   EventBus.emit('llm:thinking', { sessionId, text: 'Planning...' });
 
-  const response = await model.invoke([
-    new SystemMessage(PLANNER_PROMPT),
-    new HumanMessage(`Task: ${lastMessage.content}`),
-  ]);
+  const plannerPrompt = await buildPlannerPrompt(cwd);
+  const model = getModel(false);
 
   try {
+    const response = await model.invoke(
+      [new SystemMessage(plannerPrompt), new HumanMessage(`Task: ${lastMessage.content}`)],
+      { tool_choice: 'none' }
+    );
+
     const text = typeof response.content === 'string' ? response.content : '';
-    const json = JSON.parse(text.replace(/```json\n?|\n?```/g, ''));
+    let json = null;
+
+    try {
+      json = JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
+    } catch (err) {
+      console.error('Failed to parse planner JSON:', err, 'Response:', text);
+    }
+
+    // Validate parsed plan structure
+    if (!json?.goal || !Array.isArray(json.steps)) {
+      // Return a fallback plan with a note about invalid format
+      const fallbackPlan = {
+        goal: `Fallback plan - could not parse valid JSON plan from LLM: ${text.substring(0, 200)}`,
+        steps: [],
+        risk: 'medium',
+        files_affected: [],
+        approved: false,
+      };
+      EventBus.emit('agent:plan', { sessionId, plan: fallbackPlan });
+      return { plan: fallbackPlan, approved: false };
+    }
+
     const plan = { ...json, approved: false };
 
     EventBus.emit('agent:plan', { sessionId, plan });
-
-    const approval = interrupt({ type: 'plan_approval', plan });
-
-    if (approval === 'reject') {
-      return { plan: null };
-    }
-
-    return { plan: { ...plan, approved: true } };
+    debug('RETURN PLAN ', plan);
+    return { plan, approved: false };
   } catch {
-    return { plan: { goal: String(lastMessage.content), steps: [], approved: true } };
+    debug('FALLBACK  PLAN ', String(lastMessage.content));
+    // Return a minimal default plan with 1 step asking for clarification
+    return {
+      plan: {
+        goal: `Fallback plan - requesting clarification for task: ${String(lastMessage.content)}`,
+        steps: [
+          {
+            action: 'ask_clarification',
+            description: 'Please provide more details or clarify the task.',
+          },
+        ],
+        risk: 'low',
+        files_affected: [],
+        approved: false,
+      },
+    };
   }
 };
