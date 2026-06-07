@@ -1,6 +1,6 @@
 import { gatherProjectContext } from '../helpers';
 import type { ProjectContext, CacheEntry } from '@robocode-packages/shared';
-import { debug } from '@robocode-packages/shared';
+import { debug, getGitStatus } from '@robocode-packages/shared';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONTEXT_TTL_MS, WATCHED_FILES } from '@robocode-packages/config';
@@ -19,8 +19,28 @@ export class ContextService {
   private static buildWatchedFiles(cwd: string): Map<string, number> {
     const map = new Map<string, number>();
     for (const file of WATCHED_FILES) {
+      if (file.includes('*') || file.includes('?')) {
+        const entries = fs.readdirSync(cwd, { withFileTypes: true });
+        const escaped = file
+          .replace(/[.+^${}()|[\]\\*?]/g, '\\$&')
+          .replace(/\\\*/g, '.*')
+          .replace(/\\\?/g, '.');
+        const matcher = new RegExp(`^${escaped}$`);
+
+        for (const entry of entries) {
+          if (matcher.test(entry.name)) {
+            const fullPath = path.join(cwd, entry.name);
+            map.set(fullPath, this.getFileMtime(fullPath));
+          }
+        }
+
+        continue;
+      }
+
       const fullPath = path.join(cwd, file);
-      map.set(fullPath, this.getFileMtime(fullPath));
+      if (fs.existsSync(fullPath)) {
+        map.set(fullPath, this.getFileMtime(fullPath));
+      }
     }
     return map;
   }
@@ -38,12 +58,21 @@ export class ContextService {
     return false;
   }
 
+  private static async getGitSignature(cwd: string): Promise<string | null> {
+    return getGitStatus(cwd);
+  }
+
   static async get(cwd: string): Promise<ProjectContext> {
     const cached = this.cache.get(cwd);
 
     if (cached && !this.isStale(cached)) {
-      debug('[ContextService] cache hit', cwd);
-      return cached.context;
+      const gitSignature = await this.getGitSignature(cwd);
+      if (gitSignature === cached.gitSignature) {
+        debug('[ContextService] cache hit', cwd);
+        return cached.context;
+      }
+
+      debug('[ContextService] git state changed', cwd);
     }
 
     debug('[ContextService] cache miss — gathering context', cwd);
@@ -53,6 +82,7 @@ export class ContextService {
       context,
       timestamp: Date.now(),
       watchedFiles: this.buildWatchedFiles(cwd),
+      gitSignature: await this.getGitSignature(cwd),
     });
 
     return context;

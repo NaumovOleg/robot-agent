@@ -1,0 +1,1 @@
+export { renameSymbolTool } from './renameSymbol';

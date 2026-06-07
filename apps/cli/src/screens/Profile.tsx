@@ -195,7 +195,9 @@ export const ProfileScreen: React.FC = () => {
         return;
       }
       if (input === ' ' || key.return) {
-        setProvider(PROVIDERS_LIST[providerIndex]!);
+        const selectedProvider = PROVIDERS_LIST[providerIndex];
+        if (!selectedProvider) return;
+        setProvider(selectedProvider);
         setStep(step === 'create_provider' ? 'create_model' : 'edit_model');
         return;
       }
@@ -219,7 +221,7 @@ export const ProfileScreen: React.FC = () => {
             const isCreate = item === '+ create profile';
 
             return (
-              <Box key={isCreate ? item : profile!.id}>
+              <Box key={isCreate ? item : profile?.id ?? item}>
                 <Text color={isSelected ? 'blueBright' : 'white'}>
                   {isSelected ? '▶ ' : '  '}
                   {!isCreate && (isActive ? '● ' : '○ ')}
@@ -259,6 +261,17 @@ export const ProfileScreen: React.FC = () => {
             {targetProfile?.provider} / {targetProfile?.model}
           </Text>
         </Box>
+
+        {targetProfile && (
+          <Box marginBottom={1}>
+            <Text color="gray">
+              {' '}
+              {targetProfile.supportsStreaming ? 'streaming' : 'no streaming'} /{' '}
+              {targetProfile.contextWindowHint ?? 'unknown'} window /{' '}
+              {targetProfile.costTier ?? 'unknown'} cost
+            </Text>
+          </Box>
+        )}
 
         <Box flexDirection="column" marginBottom={1}>
           {DROPDOWN_ITEMS.map((action, i) => {

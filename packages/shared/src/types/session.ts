@@ -6,4 +6,9 @@ export interface Session {
   messageCount: number;
   active: boolean;
   cwd: string;
+  transcriptPath?: string;
+  auditPath?: string;
+  summary?: string;
+  forkedFromId?: string;
+  forkedFromName?: string;
 }

@@ -1,4 +1,5 @@
-import type { PendingToolCall, Plan } from '@types';
+import type { Session } from './session';
+import type { ClarificationSource } from './agent';
 
 export interface AppEvents {
   'user:message': { sessionId: string; content: string };
@@ -9,19 +10,53 @@ export interface AppEvents {
   'llm:start': { sessionId: string };
   'llm:end': { sessionId: string };
   'llm:error': { sessionId: string; error: string };
+  'llm:usage': {
+    sessionId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cost: number;
+  };
 
-  'agent:plan': { sessionId: string; plan: { goal: string; steps: string[] } };
-  'agent:plan_pending': { sessionId: string; plan: Plan | null };
-  'agent:plan_decision': {
+  'agent:plan_pending': { sessionId: string; plan: string };
+  'agent:plan_decision': { sessionId: string; approved: boolean; plan: string };
+  'agent:tool_pending': {
+    sessionId: string;
+    toolCall: { name: string; input: unknown };
+    source?: 'root';
+  };
+  'agent:tool_decision': {
     sessionId: string;
     approved: boolean;
-    plan: Plan | null;
+    toolCall: { name: string; input: unknown };
   };
-  'agent:tool_pending': { sessionId: string; toolCall: PendingToolCall };
-  'agent:tool_decision': { sessionId: string; approved: boolean; toolCall: PendingToolCall };
   'agent:stopped': { sessionId: string };
+  'agent:resume': { sessionId: string; decision: 'approve' | 'reject' | 'y' | 'n' };
+  'agent:stop': { sessionId: string };
+  'agent:allow_tool': { toolName: string };
+  'agent:delete-checkpoint': string;
+  'agent:set-session': Session | null;
+  'agent:run': string;
+  'agent:git_diff': {
+    sessionId: string;
+    gitDiffStat: string | null;
+    gitDiffPreview: string | null;
+  };
 
-  'tool:start': { sessionId: string; name: string; input: unknown; callId: string };
+  'tool:start': { sessionId: string; name: string; input: unknown; callId?: string };
+  'tool:stream': {
+    sessionId: string;
+    name: string;
+    chunk: string;
+    stream: 'stdout' | 'stderr';
+    callId?: string;
+  };
   'tool:end': { sessionId: string; name: string; output: unknown; callId: string };
   'tool:error': { sessionId: string; name: string; error: string; callId: string };
+
+  'session:set': { sessionId: string };
+  'agent:compact_request': { sessionId: string };
+  'agent:compact_complete': { sessionId: string; originalCount: number };
+  'agent:question': { sessionId: string; question: string; source: ClarificationSource | null };
+  'agent:answer': { sessionId: string; answer: string; source: ClarificationSource | null };
 }

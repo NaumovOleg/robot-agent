@@ -1,6 +1,25 @@
 allowBuilds:
+  better-sqlite3: true
   esbuild: true
   keytar: true
+  tree-sitter: true
+  tree-sitter-c: set this to true or false
+  tree-sitter-c-sharp: set this to true or false
+  tree-sitter-cli: true
+  tree-sitter-dart: true
+  tree-sitter-go: true
+  tree-sitter-java: true
+  tree-sitter-javascript: true
+  tree-sitter-json: true
+  tree-sitter-php: true
+  tree-sitter-python: true
+  tree-sitter-ruby: true
+  tree-sitter-rust: true
+  tree-sitter-swift: true
+  tree-sitter-toml: true
+  tree-sitter-typescript: true
+  tree-sitter-yaml: true
+  unrs-resolver: true
 packages:
   - 'apps/*'
   - 'packages/*'

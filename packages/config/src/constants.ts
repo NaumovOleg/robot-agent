@@ -27,3 +27,13 @@ export enum API_KEYS {
   groq = 'groq:api-key',
   ollama = 'ollama:api-key',
 }
+
+export const DB_PATH = path.join(os.homedir(), '.robocode', 'checkpoints.db');
+
+export const MODEL_CONTEXT: Record<string, number> = {
+  'claude-sonnet-4-6':         200_000,
+  'claude-opus-4-8':           200_000,
+  'claude-haiku-4-5-20251001': 200_000,
+};
+
+export const ALLOWED_TOOLS_PATH = path.join(ROOT_DIR, 'allowed-tools.json');

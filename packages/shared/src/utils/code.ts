@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 export const detectTechStack = (pkg: Record<string, unknown> | null): string[] => {
   if (!pkg) return [];
   const deps = {
@@ -387,4 +390,27 @@ export const detectTechStack = (pkg: Record<string, unknown> | null): string[] =
   }
 
   return [...new Set(stack)];
+};
+
+export const detectProjectLanguage = (cwd: string): string => {
+  const checks: [string, string][] = [
+    ['tsconfig.json', 'typescript'],
+    ['package.json', 'javascript'],
+    ['go.mod', 'go'],
+    ['Cargo.toml', 'rust'],
+    ['setup.py', 'python'],
+    ['requirements.txt', 'python'],
+    ['Gemfile', 'ruby'],
+    ['pom.xml', 'java'],
+    ['build.gradle', 'java'],
+    ['composer.json', 'php'],
+    ['Package.swift', 'swift'],
+    ['pubspec.yaml', 'dart'],
+  ];
+
+  for (const [file, lang] of checks) {
+    if (fs.existsSync(path.join(cwd, file))) return lang;
+  }
+
+  return 'typescript'; // default
 };

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 
-type Props = {
+interface Props {
   title: string;
   display: boolean;
   confirm: () => void;
   cancel?: () => void;
   name: string;
-};
+}
 
 export const ConfirmDelete: React.FC<Props> = ({ title, display, confirm, cancel, name }) => {
   useInput(
@@ -34,7 +34,7 @@ export const ConfirmDelete: React.FC<Props> = ({ title, display, confirm, cancel
 
       <Box marginBottom={1}>
         <Text>Delete </Text>
-        <Text color="white" bold>
+        <Text color="yellow" bold>
           {name}
         </Text>
         <Text>? This cannot be undone.</Text>

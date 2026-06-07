@@ -1,4 +1,3 @@
-import { z } from "zod";
 
 // LLM Provider Abstraction
 export interface LLMProvider {
@@ -22,7 +21,10 @@ export interface GenerateResponse {
 
 // OpenAI Provider Stub
 export class OpenAIProvider implements LLMProvider {
-  async *generate(prompt: string, options?: GenerateOptions): AsyncIterable<GenerateResponse> {
+  async *generate(
+    prompt: string,
+    _options?: GenerateOptions
+  ): AsyncIterable<GenerateResponse> {
     // Stub implementation
     yield { text: `OpenAI response to: ${prompt}`, done: false };
     await new Promise((r) => setTimeout(r, 500));
@@ -34,7 +36,10 @@ export class OpenAIProvider implements LLMProvider {
 
 // Anthropic Provider Stub
 export class AnthropicProvider implements LLMProvider {
-  async *generate(prompt: string, options?: GenerateOptions): AsyncIterable<GenerateResponse> {
+  async *generate(
+    prompt: string,
+    _options?: GenerateOptions
+  ): AsyncIterable<GenerateResponse> {
     // Stub implementation
     yield { text: `Anthropic response to: ${prompt}`, done: false };
     await new Promise((r) => setTimeout(r, 500));

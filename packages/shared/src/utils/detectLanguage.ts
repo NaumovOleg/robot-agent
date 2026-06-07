@@ -17,6 +17,7 @@ export const detectLanguage = (filePath: string): string => {
     '.java': 'java',
     '.kt': 'kotlin',
     '.cs': 'csharp',
+    '.php': 'php',
     '.cpp': 'cpp',
     '.c': 'c',
     '.swift': 'swift',

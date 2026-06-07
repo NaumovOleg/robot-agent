@@ -1,94 +1,39 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useRouter, useProfile } from '@hooks';
-import { SessionList } from '@components';
+import { PALETTE } from '@utils';
 
-const ROBOT_LOGO = [
-  '  ╦═╗╔═╗╔╗ ╔═╗╔═╗╔═╗╔╦╗╔═╗',
-  '  ╠╦╝║ ║╠╩╗║ ║║  ║ ║ ║║║╣ ',
-  '  ╩╚═╚═╝╚═╝╚═╝╚═╝╚═╝═╩╝╚═╝',
-];
+const VERSION = '0.1.0';
+const LOGO_TEXT = 'R O B O C O D E';
 
 export const WelcomeScreen: React.FC = () => {
-  const { list, active } = useProfile();
   const { navigate } = useRouter();
+  const { list, active } = useProfile();
 
   const profiles = list();
   const activeProfile = profiles.length > 0 ? active() : null;
 
   useInput((input, key) => {
-    if (!activeProfile) {
-      if (input === 'y' || input === 'Y') {
-        navigate('profile');
-        return;
-      }
-      if (input === 'n' || input === 'N' || key.escape) {
-        navigate('assistant');
-        return;
-      }
-    }
+    if (activeProfile) return;
+    if (input === 'y' || input === 'Y') navigate('profile');
+    if (input === 'n' || input === 'N' || key.escape) navigate('assistant');
   });
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={1}>
-      <Box flexDirection="column" marginBottom={1}>
-        {ROBOT_LOGO.map((line, i) => (
-          <Text key={i} color={i === 0 ? 'blueBright' : i === 1 ? 'blue' : 'blueBright'}>
-            {line}
-          </Text>
-        ))}
+    <Box flexDirection="column" paddingX={2} paddingY={1} gap={1}>
+      <Box flexDirection="column">
+        <Text color={PALETTE.teal} bold>{LOGO_TEXT}</Text>
+        <Text color={PALETTE.muted}>AI CODE ASSISTANT · v{VERSION}</Text>
       </Box>
 
-      <Box marginBottom={1}>
-        <Text color="gray"> AI code assistant</Text>
-      </Box>
-
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={activeProfile ? 'green' : 'yellow'}>
-          {'  '}● {activeProfile ? `connected as ${activeProfile.name}` : 'no active profile'}
-        </Text>
-        {activeProfile && (
-          <Text color="gray">
-            {'     '}
-            {activeProfile.provider} / {activeProfile.model}
-          </Text>
-        )}
-      </Box>
-
-      <Box marginBottom={1}>
-        <Text color="gray">
-          {'  '}
-          {'─'.repeat(50)}
-        </Text>
-      </Box>
-
-      {!activeProfile ? (
-        <Box flexDirection="column" gap={1}>
-          <Box flexDirection="column">
-            <Text>{'  '}Welcome 👋</Text>
-            <Text color="gray">{'  '}No active profile found.</Text>
-            <Text color="gray">{'  '}Would you like to set one up?</Text>
+      {!activeProfile && (
+        <Box flexDirection="column" gap={1} marginTop={1}>
+          <Text color={PALETTE.muted}>No profile configured.</Text>
+          <Box gap={3}>
+            <Text color={PALETTE.sage}>[ Y ] Set up profile</Text>
+            <Text color={PALETTE.muted}>[ N ] Skip</Text>
           </Box>
-
-          <Box gap={3} paddingLeft={2}>
-            <Text color="green" bold>
-              Y yes, set up profile
-            </Text>
-            <Text color="gray">N skip for now</Text>
-          </Box>
-
-          <Box marginTop={1} paddingLeft={2}>
-            <Text dimColor>press Y or N</Text>
-          </Box>
-        </Box>
-      ) : (
-        <Box flexDirection="column" gap={1}>
-          <Box paddingLeft={2} marginBottom={1}>
-            <Text color="white">Welcome back 👋 </Text>
-            <Text color="gray">choose a session or start new</Text>
-          </Box>
-
-          <SessionList />
+          <Text color={PALETTE.faint} dimColor>y / n</Text>
         </Box>
       )}
     </Box>

@@ -3,8 +3,11 @@ import {
   FileSystem,
   deserializeMessages,
   sessionJsonPath,
+  summarizeMessages,
   serializeMessages,
 } from '@robocode-packages/shared';
+import { SessionService } from './session';
+import { TranscriptService } from './transcript';
 
 export class MessageService {
   static load(sessionId: string): BaseMessage[] {
@@ -20,6 +23,8 @@ export class MessageService {
   static save(sessionId: string, messages: BaseMessage[]): void {
     const content = serializeMessages(messages);
     FileSystem.writeFile(sessionJsonPath(sessionId), content);
+    SessionService.updateMessageCount(sessionId, messages.length, summarizeMessages(messages));
+    TranscriptService.write(sessionId, messages);
   }
 
   static add(sessionId: string, message: BaseMessage | string): BaseMessage[] {

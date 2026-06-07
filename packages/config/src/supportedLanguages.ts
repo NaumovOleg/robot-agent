@@ -1,0 +1,15 @@
+export type SupportedLanguage =
+  | 'typescript'
+  | 'javascript'
+  | 'python'
+  | 'rust'
+  | 'go'
+  | 'java'
+  | 'kotlin'
+  | 'ruby'
+  | 'php'
+  | 'csharp'
+  | 'cpp'
+  | 'c'
+  | 'swift'
+  | 'unknown';

@@ -1,0 +1,62 @@
+export const DEFINITION_PATTERNS: Record<string, string[]> = {
+  typescript: [
+    String.raw`(export\s+)?(const|let|var)\s+{name}\s*[=:]`,
+    String.raw`(export\\s+)?function\\s+{name}\\s*[(<]`,
+    String.raw`(export\\s+)?(abstract\\s+)?class\\s+{name}[\\s{<(]`,
+    String.raw`(export\\s+)?interface\\s+{name}[\\s{<]`,
+    String.raw`(export\\s+)?type\\s+{name}\\s*=`,
+    String.raw`(export\\s+)?enum\\s+{name}[\\s{]`,
+  ],
+  javascript: [
+    String.raw`(export\\s+)?(const|let|var)\\s+{name}\\s*=`,
+    String.raw`(export\\s+)?function\\s+{name}\\s*[(<]`,
+    String.raw`(export\\s+)?class\\s+{name}[\\s{]`,
+    String.raw`module\\.exports\\.{name}\\s*=`,
+  ],
+  python: [
+    String.raw`^def\\s+{name}\\s*\\(`,
+    String.raw`^class\\s+{name}[:(]`,
+    String.raw`^{name}\\s*=`,
+  ],
+  go: [
+    String.raw`^func\\s+{name}\\s*\\(`,
+    String.raw`^func\\s+\\(\\w+\\s+\\*?\\w+\\)\\s+{name}\\s*\\(`,
+    String.raw`^type\\s+{name}\\s+`,
+    String.raw`^var\\s+{name}\\s+`,
+    String.raw`^const\\s+{name}\\s+`,
+  ],
+  rust: [
+    String.raw`^(pub\\s+)?(async\\s+)?fn\\s+{name}\\s*[<(]`,
+    String.raw`^(pub\\s+)?struct\\s+{name}[\\s{<]`,
+    String.raw`^(pub\\s+)?enum\\s+{name}[\\s{<]`,
+    String.raw`^(pub\\s+)?trait\\s+{name}[\\s{<]`,
+    String.raw`^(pub\\s+)?type\\s+{name}\\s*=`,
+    String.raw`^(pub\\s+)?const\\s+{name}\\s*:`,
+  ],
+  ruby: [
+    String.raw`^\\s*def\\s+{name}[\\s(]`,
+    String.raw`^\\s*class\\s+{name}[\\s<]`,
+    String.raw`^\\s*module\\s+{name}[\\s]`,
+    String.raw`^\\s*{name}\\s*=`,
+  ],
+  java: [
+    String.raw`(public|private|protected)?\\s+(static\\s+)?\\w+\\s+{name}\\s*\\(`,
+    String.raw`(public|private|protected)?\\s+class\\s+{name}[\\s{<]`,
+    String.raw`(public|private|protected)?\\s+interface\\s+{name}[\\s{<]`,
+    String.raw`(public|private|protected)?\\s+enum\\s+{name}[\\s{]`,
+  ],
+  php: [
+    String.raw`function\\s+{name}\\s*\\(`,
+    String.raw`class\\s+{name}[\\s{]`,
+    String.raw`interface\\s+{name}[\\s{]`,
+    String.raw`\\$\\{name}\\s*=`,
+  ],
+  swift: [
+    String.raw`(public|private|internal)?\\s*func\\s+{name}\\s*[<(]`,
+    String.raw`(public|private|internal)?\\s*class\\s+{name}[\\s{<:]`,
+    String.raw`(public|private|internal)?\\s*struct\\s+{name}[\\s{<:]`,
+    String.raw`(public|private|internal)?\\s*protocol\\s+{name}[\\s{]`,
+    String.raw`(public|private|internal)?\\s*enum\\s+{name}[\\s{:]`,
+    String.raw`(public|private|internal)?\\s*(var|let)\\s+{name}\\s*[=:]`,
+  ],
+};

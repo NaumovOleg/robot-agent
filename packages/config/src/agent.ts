@@ -5,21 +5,28 @@ export const MAX_AGENT_ITERATIONS = 100;
 export const CONTEXT_LINES = 3;
 
 export const TOOL_RISK: Record<string, 'safe' | 'moderate' | 'destructive'> = {
-  list_dir: 'safe',
+  // read-only — safe
   read_file: 'safe',
+  list_dir: 'safe',
   glob: 'safe',
   grep: 'safe',
-  git_status: 'safe',
+  find_definition: 'safe',
   git_diff: 'safe',
   git_log: 'safe',
-  git_blame: 'safe',
-  git_show: 'safe',
-  git_branch: 'safe',
+  analyze_code: 'safe',
+  request_approval: 'safe',
+
+  // write — moderate
+  write_file: 'moderate',
   edit_file: 'moderate',
-  write_file: 'destructive',
-  bash: 'destructive',
-  search_files: 'safe',
-  replace_lines: 'moderate',
+  insert_at_line: 'moderate',
+  bash: 'moderate',
+  run_tests: 'moderate',
+  verify_edits: 'moderate',
+
+  // destructive — always ask
+  delete_file: 'destructive',
+  rename_symbol: 'destructive',
 };
 
 export const IGNORE_DIRS = new Set([
@@ -141,3 +148,4 @@ export const WATCHED_FILES = [
 ];
 
 export const MAX_FILES_RESULTS = 50;
+export const MAX_REPLANS = 3;

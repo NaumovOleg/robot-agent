@@ -13,6 +13,19 @@ export const hasRipgrep = async (): Promise<boolean> => {
   }
 };
 
+export const inferKind = (line: string): string => {
+  if (/\bfunction\b|\bfn\b|\bdef\b|\bfunc\b/.test(line)) return 'function';
+  if (/\bclass\b/.test(line)) return 'class';
+  if (/\binterface\b/.test(line)) return 'interface';
+  if (/\btype\b/.test(line)) return 'type';
+  if (/\benum\b/.test(line)) return 'enum';
+  if (/\bconst\b|\blet\b|\bvar\b|\bval\b/.test(line)) return 'variable';
+  if (/\bstruct\b/.test(line)) return 'struct';
+  if (/\btrait\b|\bprotocol\b/.test(line)) return 'trait';
+  if (/\bmodule\b/.test(line)) return 'module';
+  return 'symbol';
+};
+
 export const searchWithRipgrep = async (
   pattern: string,
   cwd: string,
@@ -20,14 +33,14 @@ export const searchWithRipgrep = async (
     filePattern?: string;
     caseSensitive?: boolean;
     wholeWord?: boolean;
-    maxResults: number;
-    contextLines: number;
+    maxResults?: number;
+    contextLines?: number;
   }
-): Promise<string> => {
+): Promise<Match[]> => {
   const flags = [
     '--json',
-    `--context ${opts.contextLines}`,
-    `--max-count ${opts.maxResults}`,
+    opts.contextLines ? `--context ${opts.contextLines}` : '',
+    opts.maxResults ? `--max-count ${opts.maxResults}` : '',
     opts.caseSensitive ? '' : '--ignore-case',
     opts.wholeWord ? '--word-regexp' : '',
     opts.filePattern ? `--glob "${opts.filePattern}"` : '',
@@ -41,7 +54,7 @@ export const searchWithRipgrep = async (
     timeout: 15_000,
   });
 
-  return stdout;
+  return parseRipgrepJson(stdout, cwd);
 };
 
 export const parseRipgrepJson = (raw: string, cwd: string): Match[] => {
@@ -68,8 +81,10 @@ export const parseRipgrepJson = (raw: string, cwd: string): Match[] => {
           line: lineNum,
           column: colStart + 1,
           content: text,
-          context_before: [...contextBefore],
+          context_before: contextBefore,
           context_after: [],
+          context: contextBefore,
+          kind: inferKind(text),
         });
 
         contextBefore.length = 0;
@@ -136,6 +151,8 @@ export const searchWithGrep = async (
         content: content?.trimEnd() ?? '',
         context_before: contextBefore,
         context_after: contextAfter,
+        context: contextBefore.concat(contextAfter),
+        kind: inferKind(content?.trimEnd() ?? ''),
       });
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

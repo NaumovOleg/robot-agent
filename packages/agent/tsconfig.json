@@ -5,9 +5,9 @@
     "outDir": "./dist",
     "types": ["node"],
     "paths": {
+      "@utils": ["./src/utils/index.ts"],
       "@robocode-packages/config": ["../../packages/config/src/index.ts"],
       "@robocode-packages/core": ["../../packages/core/src/index.ts"],
-      "@robocode-packages/providers": ["../../packages/providers/src/index.ts"],
       "@robocode-packages/shared": ["../../packages/shared/src/index.ts"],
       "@robocode-packages/tools": ["../../packages/tools/src/index.ts"]
     }

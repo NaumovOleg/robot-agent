@@ -1,0 +1,20 @@
+export const PM_SIGNATURES: { name: string; file: string; install: string; add: string }[] = [
+  { name: 'bun', file: 'bun.lockb', install: 'bun install', add: 'bun add' },
+  { name: 'pnpm', file: 'pnpm-lock.yaml', install: 'pnpm install', add: 'pnpm add' },
+  { name: 'yarn', file: 'yarn.lock', install: 'yarn install', add: 'yarn add' },
+  { name: 'npm', file: 'package-lock.json', install: 'npm install', add: 'npm install' },
+  {
+    name: 'pip',
+    file: 'requirements.txt',
+    install: 'pip install -r requirements.txt',
+    add: 'pip install',
+  },
+  { name: 'poetry', file: 'poetry.lock', install: 'poetry install', add: 'poetry add' },
+  { name: 'pipenv', file: 'Pipfile.lock', install: 'pipenv install', add: 'pipenv install' },
+  { name: 'cargo', file: 'Cargo.lock', install: 'cargo build', add: 'cargo add' },
+  { name: 'go mod', file: 'go.sum', install: 'go mod download', add: 'go get' },
+  { name: 'maven', file: 'pom.xml', install: 'mvn dependency:resolve', add: 'mvn dependency:get' },
+  { name: 'gradle', file: 'build.gradle', install: 'gradle dependencies', add: '' },
+  { name: 'composer', file: 'composer.lock', install: 'composer install', add: 'composer require' },
+  { name: 'gem', file: 'Gemfile.lock', install: 'bundle install', add: 'bundle add' },
+];

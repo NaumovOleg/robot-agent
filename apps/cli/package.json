@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "chokidar 'src/**/*.{ts,tsx}' '../../packages/*/src/**/*.{ts,tsx}' -c 'tput reset && tsx -r tsconfig-paths/register src/index.ts' --initial --debounce 500",
+    "dev": "chokidar 'src/**/*.{ts,tsx}' '../../packages/*/src/**/*.{ts,tsx}' -c 'tput reset && tsx  src/index.ts' --initial --debounce 500",
     "build": "tsup",
     "start": "node dist/index.js",
     "prepublishOnly": "pnpm run build"
@@ -24,14 +24,17 @@
     "@robocode-packages/providers": "workspace:*",
     "@robocode-packages/shared": "workspace:*",
     "@robocode-packages/tools": "workspace:*",
+    "better-sqlite3": "^12.10.0",
     "commander": "^10.0.0",
+    "diff": "^9.0.0",
     "dotenv": "^16.0.0",
     "ink": "^5.2.1",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "react": "^18.3.1",
-    "tsx": "^3.12.7"
+    "tsx": "^3.12.7",
+    "web-tree-sitter": "^0.26.8"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",

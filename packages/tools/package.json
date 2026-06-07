@@ -5,17 +5,22 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --out-dir dist",
     "dev": "tsx watch src",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "jest  --testPathPattern='.*\\.test\\.ts$'",
+    "test:watch": "jest --watch --testMatch='**/*.test.ts'"
   },
   "dependencies": {
     "@langchain/core": "^1.1.45",
+    "@langchain/langgraph": "^1.3.0",
+    "fast-glob": "^3.3.3",
     "glob": "^13.0.6",
+    "web-tree-sitter": "^0.26.8",
     "zod": "^3.22.4"
   },
   "peerDependencies": {
     "@robocode-packages/config": "workspace:*",
-    "@robocode-packages/shared": "workspace:*",
-    "@robocode-packages/core": "workspace:*"
+    "@robocode-packages/core": "workspace:*",
+    "@robocode-packages/shared": "workspace:*"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,6 +31,9 @@
     }
   },
   "devDependencies": {
-    "@types/glob": "^9.0.0"
+    "@types/glob": "^9.0.0",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.10"
   }
 }

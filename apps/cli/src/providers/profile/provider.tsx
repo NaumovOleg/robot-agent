@@ -37,9 +37,9 @@ export const ProfileProvider: React.FC<Props> = ({ children }) => {
 
     const next = { ...updated, ...partial };
     ProfileConfig.update(partial);
-    setProfiles((prev) => prev.map((p) => (p.id === partial.id ? next : p)));
+    setProfiles(ProfileConfig.list());
 
-    return next;
+    return ProfileConfig.list().find((p) => p.id === partial.id) ?? next;
   };
 
   const value = useMemo(

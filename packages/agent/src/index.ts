@@ -1,85 +1,273 @@
 import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 import { Command, END } from '@langchain/langgraph';
-import { agent } from './graph';
-import { MessageService, SessionService } from '@robocode-packages/core';
-import { debug } from '@robocode-packages/shared';
-import { extractNewMessages } from './utils';
+import { rootGraph } from './graphs';
+import {
+  MessageService,
+  SessionService,
+  Checkpointer,
+  EventBus,
+  AuditService,
+} from '@robocode-packages/core';
+import type { Session } from '@robocode-packages/shared';
+import { debug, getGitDiffPreview, getGitDiffStat } from '@robocode-packages/shared';
+import { extractNewMessages, saveNewMessages } from './utils';
+import { compactConversation } from './context/compressor';
 
-const { EventBus } = await import('@robocode-packages/core');
+class RoboAgent {
+  private static instance: RoboAgent;
+  private session?: Session | null = SessionService.findActive();
+  private isRunning = false;
+  private readonly unsubs: (() => void)[] = [];
 
-export const runAgent = async (sessionId: string, userInput: string) => {
-  const session = SessionService.load(sessionId);
-  if (!session) throw new Error(`Session ${sessionId} not found`);
-
-  const config = {
-    configurable: { thread_id: sessionId, cwd: session.cwd },
-    recursionLimit: 200,
-  };
-
-  const userMessage = new HumanMessage(userInput);
-  MessageService.add(sessionId, userMessage);
-
-  const history = MessageService.load(sessionId);
-  debug('HISTORY', history, 'messages');
-
-  const result = await agent.invoke(
-    { messages: [userMessage], sessionId, cwd: session.cwd },
-    config
-  );
-
-  const resultMessages: BaseMessage[] = result.messages ?? [];
-  const newMessages = extractNewMessages(history, resultMessages);
-
-  debug('NEW MESSAGES from agent:', newMessages.length);
-
-  if (newMessages.length > 0) {
-    _saveNewMessages(sessionId, newMessages);
+  private getMainThreadId(sessionId?: string) {
+    return `${sessionId ?? this.session?.id ?? ''}_main`;
   }
 
-  return result;
-};
-
-export const resumeAgent = async (
-  sessionId: string,
-  decision: 'approve' | 'reject' | 'y' | 'n'
-) => {
-  const session = SessionService.load(sessionId);
-  if (!session) throw new Error(`Session ${sessionId} not found`);
-
-  const config = {
-    configurable: { thread_id: sessionId, cwd: session.cwd },
-    recursionLimit: 200,
-  };
-
-  const historyBefore = MessageService.load(sessionId);
-  debug('BEFORE RESUME:', historyBefore);
-  const result = await agent.invoke(new Command({ resume: decision }), config);
-
-  const resultMessages: BaseMessage[] = result.messages ?? [];
-  const newMessages = extractNewMessages(historyBefore, resultMessages);
-
-  debug('NEW MESSAGES after resume:', newMessages);
-
-  if (newMessages.length > 0) {
-    _saveNewMessages(sessionId, newMessages);
+  private async publishGitDiff(sessionId: string, cwd: string) {
+    const [gitDiffStat, gitDiffPreview] = await Promise.all([
+      getGitDiffStat(cwd),
+      getGitDiffPreview(cwd),
+    ]);
+    EventBus.emit('agent:git_diff', { sessionId, gitDiffStat, gitDiffPreview });
+    return { gitDiffStat, gitDiffPreview };
   }
 
-  return result;
-};
+  constructor() {
+    this.unsubs.push(EventBus.on('agent:set-session', (session) => this.setSession(session)));
 
-const _saveNewMessages = (sessionId: string, messages: BaseMessage[]) => {
-  MessageService.addMany(sessionId, messages);
+    this.unsubs.push(
+      EventBus.on('agent:run', (userInput) => {
+        this.run(userInput).catch((err) => {
+          const sid = this.session?.id ?? '';
+          debug('[run] unhandled error:', err);
+          if (sid) {
+            EventBus.emit('llm:error', { sessionId: sid, error: String(err) });
+            EventBus.emit('llm:end', { sessionId: sid });
+          }
+        });
+      })
+    );
 
-  const total = MessageService.count(sessionId);
-  SessionService.updateMessageCount(sessionId, total);
-};
+    this.unsubs.push(
+      EventBus.on('agent:resume', (params) => {
+        this.resume(params).catch((err) => {
+          debug('[resume] error:', err);
+          EventBus.emit('llm:error', { sessionId: params.sessionId, error: String(err) });
+          EventBus.emit('llm:end', { sessionId: params.sessionId });
+        });
+      })
+    );
 
-export const stopAgent = async (sessionId: string) => {
-  const config = { configurable: { thread_id: sessionId } };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await agent.invoke(new Command({ goto: END as any }), config);
-  EventBus.emit('agent:stopped', { sessionId });
-};
+    this.unsubs.push(
+      EventBus.on('agent:stop', (params) => {
+        this.stop(params).catch((err) => debug('[stop] error:', err));
+      })
+    );
 
-export { agent, buildGraph } from './graph';
-export type * from './state';
+    this.unsubs.push(
+      EventBus.on('agent:delete-checkpoint', (sessionId) => {
+        this.deleteCheckpoint(sessionId).catch((err) => debug('[deleteCheckpoint] error:', err));
+      })
+    );
+
+    this.unsubs.push(
+      EventBus.on('agent:compact_request', (params) => {
+        this.compact(params).catch((err) => debug('[compact] error:', err));
+      })
+    );
+
+    this.unsubs.push(
+      EventBus.on('agent:answer', (params) => {
+        this.answerQuestion(params).catch((err) => {
+          debug('[answerQuestion] error:', err);
+          EventBus.emit('llm:error', { sessionId: params.sessionId, error: String(err) });
+          EventBus.emit('llm:end', { sessionId: params.sessionId });
+        });
+      })
+    );
+
+    this.unsubs.push(
+      EventBus.on('agent:plan_pending', ({ sessionId, plan }) => {
+        AuditService.append(sessionId, 'agent:plan_pending', { plan });
+      })
+    );
+    this.unsubs.push(
+      EventBus.on('agent:plan_decision', ({ sessionId, approved, plan }) => {
+        AuditService.append(sessionId, 'agent:plan_decision', { approved, plan });
+      })
+    );
+    this.unsubs.push(
+      EventBus.on('agent:tool_pending', ({ sessionId, toolCall }) => {
+        AuditService.append(sessionId, 'agent:tool_pending', toolCall);
+      })
+    );
+    this.unsubs.push(
+      EventBus.on('agent:tool_decision', ({ sessionId, approved, toolCall }) => {
+        AuditService.append(sessionId, 'agent:tool_decision', { approved, toolCall });
+      })
+    );
+    this.unsubs.push(
+      EventBus.on('llm:start', ({ sessionId }) => AuditService.append(sessionId, 'llm:start', {}))
+    );
+    this.unsubs.push(
+      EventBus.on('llm:end', ({ sessionId }) => AuditService.append(sessionId, 'llm:end', {}))
+    );
+    this.unsubs.push(
+      EventBus.on('llm:error', ({ sessionId, error }) =>
+        AuditService.append(sessionId, 'llm:error', { error })
+      )
+    );
+    this.unsubs.push(
+      EventBus.on('tool:start', ({ sessionId, name, input, callId }) =>
+        AuditService.append(sessionId, 'tool:start', { name, input, callId })
+      )
+    );
+    this.unsubs.push(
+      EventBus.on('tool:end', ({ sessionId, name, output, callId }) =>
+        AuditService.append(sessionId, 'tool:end', { name, output, callId })
+      )
+    );
+    this.unsubs.push(
+      EventBus.on('tool:error', ({ sessionId, name, error, callId }) =>
+        AuditService.append(sessionId, 'tool:error', { name, error, callId })
+      )
+    );
+  }
+
+  setSession(session: Session | null) {
+    this.session = session;
+  }
+
+  public static getInstance() {
+    if (!RoboAgent.instance) RoboAgent.instance = new RoboAgent();
+    return RoboAgent.instance;
+  }
+
+  dispose(): void {
+    this.unsubs.forEach((u) => u());
+    this.unsubs.length = 0;
+  }
+
+  public async run(userRequest: string) {
+    if (this.isRunning) {
+      debug('[run] already running, dropping duplicate call');
+      return;
+    }
+    this.isRunning = true;
+    try {
+      if (!this.session) throw new Error('Session not set');
+
+      const { id: sessionId, cwd } = this.session;
+      const config = {
+        configurable: { thread_id: this.getMainThreadId(sessionId), sessionId, cwd },
+        recursionLimit: 200,
+      };
+
+      const userMessage = new HumanMessage(userRequest);
+      MessageService.add(sessionId, userMessage);
+      AuditService.append(sessionId, 'agent:run', { input: userRequest });
+
+      const result = await rootGraph.invoke({ messages: [], sessionId, cwd, userRequest }, config);
+
+      const diffPromise = this.publishGitDiff(sessionId, cwd);
+      try {
+        saveNewMessages(sessionId, result.messages ?? []);
+      } finally {
+        await diffPromise;
+      }
+
+      return { ...result, ...(await diffPromise) };
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  async resume(params: { sessionId: string; decision: 'approve' | 'reject' | 'y' | 'n' }) {
+    const { sessionId, decision } = params;
+    const session = SessionService.load(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    AuditService.append(sessionId, 'agent:resume', { decision });
+
+    const config = {
+      configurable: { thread_id: this.getMainThreadId(sessionId), sessionId, cwd: session.cwd },
+      recursionLimit: 200,
+    };
+
+    const historyBefore = MessageService.load(sessionId);
+    const result = await rootGraph.invoke(new Command({ resume: decision }), config);
+
+    const resultMessages: BaseMessage[] = result.messages ?? [];
+    const newMessages = extractNewMessages(historyBefore, resultMessages);
+    debug('NEW MESSAGES after resume:', newMessages.length);
+    saveNewMessages(sessionId, result.messages ?? []);
+
+    return result;
+  }
+
+  async answerQuestion(params: { sessionId: string; answer: string }) {
+    const { sessionId, answer } = params;
+    const session = SessionService.load(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    AuditService.append(sessionId, 'agent:answer', { answer });
+
+    const config = {
+      configurable: { thread_id: this.getMainThreadId(sessionId), sessionId, cwd: session.cwd },
+      recursionLimit: 200,
+    };
+
+    const historyBefore = MessageService.load(sessionId);
+    const result = await rootGraph.invoke(new Command({ resume: answer }), config);
+
+    const diffPromise = this.publishGitDiff(sessionId, session.cwd);
+    try {
+      const resultMessages: BaseMessage[] = result.messages ?? [];
+      const newMessages = extractNewMessages(historyBefore, resultMessages);
+      debug('NEW MESSAGES after answerQuestion:', newMessages.length);
+      saveNewMessages(sessionId, result.messages ?? []);
+    } finally {
+      await diffPromise;
+    }
+
+    return { ...result, ...(await diffPromise) };
+  }
+
+  async stop({ sessionId }: { sessionId: string }) {
+    const config = { configurable: { thread_id: this.getMainThreadId(sessionId) } };
+    AuditService.append(sessionId, 'agent:stop', {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await rootGraph.invoke(new Command({ goto: END as any }), config);
+    EventBus.emit('agent:stopped', { sessionId });
+  }
+
+  async deleteCheckpoint(sessionId: string) {
+    try {
+      const checkpointer = Checkpointer.getInstance();
+      await checkpointer.deleteThread(this.getMainThreadId(sessionId));
+    } catch (err) {
+      debug('[deleteCheckpoint] error:', err);
+    }
+  }
+
+  async compact({ sessionId }: { sessionId: string }) {
+    const messages = MessageService.load(sessionId);
+    const originalCount = messages.length;
+    EventBus.emit('llm:start', { sessionId });
+    try {
+      const summaryMsg = await compactConversation(messages);
+      MessageService.clear(sessionId);
+      MessageService.add(sessionId, summaryMsg);
+      EventBus.emit('agent:compact_complete', { sessionId, originalCount });
+    } catch (err) {
+      EventBus.emit('llm:error', { sessionId, error: String(err) });
+    } finally {
+      EventBus.emit('llm:end', { sessionId });
+    }
+  }
+}
+
+export const runAgent = RoboAgent.getInstance();
+export { rootGraph, buildGraph } from './graphs';
+
+export { canResume } from './utils';

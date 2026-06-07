@@ -1,8 +1,9 @@
-export type Route = 'welcome' | 'profile' | 'assistant' | 'settings';
+export type Route = 'welcome' | 'profile' | 'assistant' | 'history' | 'settings';
 export enum Routes {
   'welcome' = 'welcome',
   'profile' = 'profile',
   'assistant' = 'assistant',
+  'history' = 'history',
   'settings' = 'settings',
 }
 

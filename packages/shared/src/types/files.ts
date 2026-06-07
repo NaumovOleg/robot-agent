@@ -5,4 +5,6 @@ export interface Match {
   content: string;
   context_before: string[];
   context_after: string[];
+  kind?: string;
+  context: string[];
 }

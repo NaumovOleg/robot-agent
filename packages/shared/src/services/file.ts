@@ -7,6 +7,8 @@ import {
   deleteFile,
   readFile,
   writeFile,
+  appendFile,
+  copyFile,
 } from '../utils/fs';
 
 export class FileSystem {
@@ -38,5 +40,13 @@ export class FileSystem {
   };
   static readonly writeFile = (pathname: string, content: string) => {
     return writeFile(pathname, content);
+  };
+
+  static readonly appendFile = (pathname: string, content: string) => {
+    return appendFile(pathname, content);
+  };
+
+  static readonly copyFile = (from: string, to: string) => {
+    return copyFile(from, to);
   };
 }

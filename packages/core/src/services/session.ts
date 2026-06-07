@@ -1,15 +1,24 @@
-import { FileSystem, sessionMdPath } from '@robocode-packages/shared';
+import {
+  FileSystem,
+  sessionAuditPath,
+  sessionJsonPath,
+  sessionMdPath,
+} from '@robocode-packages/shared';
 import type { Session } from '@robocode-packages/shared';
 import { SESSION_INDEX_PATH } from '@robocode-packages/config';
-import { writeMessagesToFile } from '../helpers';
+import { AuditService } from './audit';
 
 export class SessionService {
-  static active: Session | null = null;
+  public static active: Session | null = null;
   static list(): Session[] {
     const sessions = FileSystem.loadJson<Session[]>(SESSION_INDEX_PATH) ?? [];
     this.active = this.active ?? sessions.find((s) => s.active) ?? null;
 
     return sessions;
+  }
+
+  static findActive() {
+    return this.list().find((s) => s.active);
   }
 
   static load(id: string): Session | null {
@@ -19,17 +28,20 @@ export class SessionService {
     return session;
   }
 
-  static set(id: string | null) {
+  static set(id: string | null): Session | null | undefined {
     if (id === null) {
+      const cleared = this.list().map((m) => ({ ...m, active: false }));
+      FileSystem.writeJson(SESSION_INDEX_PATH, cleared);
       this.active = null;
-      return;
+      return null;
     }
     const list = this.list();
-    const meta = list.find((el) => el.id === id);
-    if (!meta) return;
-    meta.active = true;
-    this.active = meta;
-    this.updateIndex(meta);
+    const found = list.find((el) => el.id === id);
+    if (!found) return undefined;
+    found.active = true;
+    this.active = found;
+    this.updateIndex(found);
+    return found;
   }
 
   static create(cwd?: string): Session {
@@ -43,11 +55,42 @@ export class SessionService {
       messageCount: 0,
       active: true,
       cwd: cwd ?? process.cwd(),
+      transcriptPath: sessionMdPath(id),
+      auditPath: sessionAuditPath(id),
     };
+    this.active = session;
 
-    writeMessagesToFile(id, []);
     this.updateIndex(session);
     return session;
+  }
+
+  static fork(id: string, cwd?: string): Session {
+    const source = this.load(id);
+    if (!source) throw new Error(`Session ${id} not found`);
+
+    const forked = this.create(cwd ?? source.cwd);
+    const now = new Date().toISOString();
+    forked.name = `${source.name} (fork)`;
+    forked.createdAt = now;
+    forked.updatedAt = now;
+    forked.messageCount = source.messageCount;
+    forked.summary = source.summary;
+    forked.transcriptPath = sessionMdPath(forked.id);
+    forked.auditPath = sessionAuditPath(forked.id);
+    forked.forkedFromId = source.id;
+    forked.forkedFromName = source.name;
+    this.updateIndex(forked);
+
+    FileSystem.copyFile(sessionJsonPath(id), sessionJsonPath(forked.id));
+    FileSystem.copyFile(sessionMdPath(id), sessionMdPath(forked.id));
+    FileSystem.copyFile(sessionAuditPath(id), sessionAuditPath(forked.id));
+    AuditService.append(forked.id, 'session:fork', {
+      sourceSessionId: id,
+      sourceName: source.name,
+    });
+
+    this.active = forked;
+    return forked;
   }
 
   static rename(id: string, name: string): void {
@@ -60,19 +103,34 @@ export class SessionService {
   }
 
   static delete(id: string): void {
+    FileSystem.deleteFile(sessionJsonPath(id));
     FileSystem.deleteFile(sessionMdPath(id));
-    const newIndex = this.list().filter((m) => m.id !== id);
+    FileSystem.deleteFile(sessionAuditPath(id));
+    let newIndex = this.list().filter((m) => m.id !== id);
+
+    if (newIndex.length > 0 && !newIndex.some((m) => m.active)) {
+      newIndex = newIndex.map((m, i) => ({ ...m, active: i === 0 }));
+      this.active = newIndex[0] ?? null;
+    } else {
+      this.active = newIndex.find((m) => m.active) ?? null;
+    }
+
     FileSystem.writeJson(SESSION_INDEX_PATH, newIndex);
+  }
+
+  static get(id: string) {
+    return this.list().find((m) => m.id === id);
   }
 
   static clear(id: string): Session {
     const index = this.list();
     const session = index.find((m) => m.id === id);
     if (!session) throw new Error(`Session ${id} not found`);
-    writeMessagesToFile(id, []);
     session.messageCount = 0;
     session.updatedAt = new Date().toISOString();
+    session.summary = undefined;
     this.updateIndex(session);
+    FileSystem.deleteFile(sessionAuditPath(id));
     if (id === this.active?.id) {
       this.active = null;
     }
@@ -93,12 +151,13 @@ export class SessionService {
     FileSystem.writeJson(SESSION_INDEX_PATH, index);
   }
 
-  static updateMessageCount(sessionId: string, count: number): void {
+  static updateMessageCount(sessionId: string, count: number, summary?: string): void {
     const index = this.list();
     const meta = index.find((s) => s.id === sessionId);
     if (!meta) return;
     meta.messageCount = count;
     meta.updatedAt = new Date().toISOString();
+    meta.summary = summary;
     this.updateIndex(meta);
   }
 }

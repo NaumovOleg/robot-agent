@@ -22,7 +22,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "clean": "rm -rf node_modules **/node_modules **/dist",
     "bootstrap": "pnpm install && pnpm -r run build",
-    "debug": "tail -f ~/.robocode/debug.log"
+    "debug": "tail -f ~/.robocode/debug.log",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch --testMatch='**/*.test.ts'"
   },
   "dependencies": {
     "@changesets/cli": "^2.31.0",
@@ -46,8 +48,11 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/react": "^19.2.14",
     "eslint": "^10.3.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.10",
     "ts-node": "^10.9.2"
   }
 }

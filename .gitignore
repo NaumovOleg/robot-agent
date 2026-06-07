@@ -9,3 +9,6 @@ src/examples/mock/*
 *.tsbuildinfo
 *.log
 **/.robocode/*
+
+# Visual brainstorm sessions
+.superpowers/

@@ -1,11 +1,14 @@
 export * from './tools';
 export * from './utils';
+import { searchFilesTool } from './tools/reader';
+import type { StructuredToolInterface } from '@langchain/core/tools';
 
 import {
   bashTool,
   readFileTool,
   writeFileTool,
   editFileTool,
+  patchFileTool,
   globTool,
   grepTool,
   listDirTool,
@@ -15,8 +18,7 @@ import {
   gitBlameTool,
   gitShowTool,
   gitBranchTool,
-  searchFilesTool,
-  replaceLinesTool,
+  findDefinitionTool,
 } from './tools';
 
 export const ALL_TOOLS = [
@@ -24,11 +26,12 @@ export const ALL_TOOLS = [
   listDirTool,
   readFileTool,
   searchFilesTool,
+  findDefinitionTool,
   globTool,
   grepTool,
   // Editing
-  replaceLinesTool,
   editFileTool,
+  patchFileTool,
   writeFileTool,
   // Executing
   bashTool,
@@ -39,4 +42,8 @@ export const ALL_TOOLS = [
   gitBlameTool,
   gitShowTool,
   gitBranchTool,
+];
+
+export const createAgentTools = (...delegateTools: StructuredToolInterface[]) => [
+  ...delegateTools,
 ];
