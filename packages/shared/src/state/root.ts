@@ -21,4 +21,5 @@ export const RootState = Annotation.Root({
   answer: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   question: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   userRequest: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  selectedFiles: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
 });

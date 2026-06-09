@@ -51,3 +51,14 @@ export const preRoute = ({ answer, router, userRequest }: RootStateType) => {
     question: null,
   };
 };
+
+export const afterRouterIntent = (state: RootStateType): string => {
+  const intent = state.router.intent;
+  if (!intent) return 'agent';
+  if (intent.needsClarification) return 'question_node';
+
+  if (intent.pipeline === 'direct_answer') return 'agent';
+  if (intent.pipeline === 'direct_command') return 'agent';
+  if (intent.shouldSearchCodebase) return 'file_selector';
+  return 'planner';
+};

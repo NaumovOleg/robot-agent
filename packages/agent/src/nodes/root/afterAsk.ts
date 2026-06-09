@@ -3,9 +3,8 @@ import { debug } from '@robocode-packages/shared';
 
 export const afterAsk = (state: RootStateType): string => {
   const source = state.clarificationSource;
-  debug('[afterAskUserRouter] routing back to source:', source);
-
+  debug('[afterAskRouter] routing back to source:', source);
   if (source === 'router') return 'pre_route';
-
+  if (source === 'planner') return 'planner';
   return 'agent';
 };

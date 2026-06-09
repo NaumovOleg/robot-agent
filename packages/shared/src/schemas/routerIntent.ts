@@ -55,7 +55,16 @@ const CommandIntentSchema = z
 export const IntentRouterSchema = z
   .object({
     schemaVersion: z.literal('intent.router.v4').default('intent.router.v4'),
-
+    resolvedRequest: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .describe(
+        'Canonical user request after applying all clarification answers and context. ' +
+          'Must contain the final actionable task that downstream planners and executors should follow. ' +
+          'Should be self-contained and understandable without the original conversation.'
+      ),
     intent: z
       .enum([
         'add_feature',
