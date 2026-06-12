@@ -25,7 +25,9 @@ export const restoreSnapshot = async (
   for (const [file, content] of Object.entries(snapshot)) {
     const abs = path.resolve(cwd, file);
     if (content === null) {
-      await fs.unlink(abs).catch(() => undefined);
+      await fs.unlink(abs).catch((e: NodeJS.ErrnoException) => {
+        if (e.code !== 'ENOENT') throw e;
+      });
     } else {
       await fs.mkdir(path.dirname(abs), { recursive: true });
       await fs.writeFile(abs, content, 'utf-8');

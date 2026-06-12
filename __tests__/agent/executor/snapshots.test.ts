@@ -32,4 +32,14 @@ describe('snapshots', () => {
     expect(await fs.readFile(path.join(dir, 'a.ts'), 'utf-8')).toBe('original A');
     await expect(fs.access(path.join(dir, 'new.ts'))).rejects.toThrow();
   });
+
+  it('restore tolerates already-absent files marked null', async () => {
+    const snap = await takeSnapshot(dir, ['missing.ts']);
+    await expect(restoreSnapshot(dir, snap)).resolves.toBeUndefined();
+  });
+
+  it('takeSnapshot dedupes repeated paths', async () => {
+    const snap = await takeSnapshot(dir, ['a.ts', 'a.ts']);
+    expect(Object.keys(snap)).toEqual(['a.ts']);
+  });
 });
