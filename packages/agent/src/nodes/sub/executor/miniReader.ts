@@ -11,14 +11,26 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   const step = plan?.steps.find((s) => s.id === currentStepId);
   if (!plan || !step) return { currentHints: [], lastError: 'mini_reader: no current step' };
 
+  const targetFiles = step.files.slice(0, 15);
+  if (targetFiles.length < step.files.length) {
+    debug('[executor/mini_reader] clipped file list', step.files.length, '→ 15');
+  }
+
   const files = (
     await Promise.all(
-      step.files.map(async (file) => {
+      targetFiles.map(async (file) => {
         const content = await fs.readFile(path.resolve(cwd, file), 'utf-8').catch(() => null);
         return content === null ? null : { file, content };
       })
     )
   ).filter((f): f is { file: string; content: string } => f !== null);
+
+  if (files.length === 0 && step.files.length > 0 && step.kind !== 'create') {
+    return {
+      currentHints: [],
+      lastError: `mini_reader: file(s) not found for ${step.kind} step: ${step.files.join(', ')}`,
+    };
+  }
 
   const findings = step.depends_on
     .map((depId) => state.readerFindings[depId])
@@ -35,11 +47,10 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     appliedOps: state.appliedOps[step.id] ?? [],
   });
 
-  const model = getModel(false).withStructuredOutput(MiniReaderOutputSchema, {
-    name: 'mini_reader',
-  });
-
   try {
+    const model = getModel(false).withStructuredOutput(MiniReaderOutputSchema, {
+      name: 'mini_reader',
+    });
     const output = await model.invoke([
       new SystemMessage(prompt),
       new HumanMessage(`Generate the edit hints for step "${step.id}".`),

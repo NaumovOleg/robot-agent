@@ -37,4 +37,15 @@ describe('buildMiniReaderPrompt', () => {
     expect(prompt).toContain('use the existing helper');
     expect(prompt).toContain('replace_text src/a.ts');
   });
+
+  it('truncates oversized file content', () => {
+    const big = 'x'.repeat(31_000);
+    const prompt = buildMiniReaderPrompt({
+      step, goal: 'g', constraints: [], findings: [],
+      files: [{ file: 'src/big.ts', content: big }],
+      lastError: null, userGuidance: null, appliedOps: [],
+    });
+    expect(prompt).toContain('…[truncated]');
+    expect(prompt.length).toBeLessThan(big.length + 5_000);
+  });
 });

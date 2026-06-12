@@ -7,6 +7,7 @@ export interface MiniReaderPromptInput {
   goal: string;
   constraints: string[];
   files: { file: string; content: string }[];
+  // operationHints from digests are intentionally not rendered — summary+keyFindings carry the prompt signal
   findings: ReaderDigest[];
   lastError: string | null;
   userGuidance: string | null;
