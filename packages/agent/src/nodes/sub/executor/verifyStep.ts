@@ -14,7 +14,7 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
   // Tier 2a: type check
   if (verifyCommands.typeCheck) {
     const result = await runCommand(verifyCommands.typeCheck, cwd);
-    const failed = !result.ok || /error TS\d+|error\[|error:/.test(result.output);
+    const failed = !result.ok || /(\berror TS\d+)|(\berror\[)|((^|\s)error:)/m.test(result.output);
     EventBus.emit('executor:step:verify', {
       sessionId, stepId: currentStepId, command: verifyCommands.typeCheck, ok: !failed,
       output: failed ? tail(result.output) : undefined,
@@ -28,12 +28,14 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
     }
   }
 
-  // Tier 2b: related test file only — never the whole suite
+  // Tier 2b: related test files only — never the whole suite
+  let testOutput: string | null = null;
   if (verifyCommands.testRunner) {
     for (const file of step.files) {
       const testFile = await findRelatedTestFile(file, cwd);
       if (!testFile) continue;
-      const cmd = `${verifyCommands.testRunner} ${testFile}`;
+      const quoted = `'${testFile.replace(/'/g, `'\\''`)}'`;
+      const cmd = `${verifyCommands.testRunner} ${quoted}`;
       const result = await runCommand(cmd, cwd);
       EventBus.emit('executor:step:verify', {
         sessionId, stepId: currentStepId, command: cmd, ok: result.ok,
@@ -46,9 +48,9 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
           verifyOutput: tail(result.output),
         };
       }
-      return { lastError: null, verifyOutput: tail(result.output) };
+      testOutput = tail(result.output);
     }
   }
 
-  return { lastError: null, verifyOutput: state.verifyOutput ?? null };
+  return { lastError: null, verifyOutput: testOutput };
 };

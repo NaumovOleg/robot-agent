@@ -54,4 +54,32 @@ describe('verifyStepNode', () => {
     expect(res.lastError).toBeNull();
     expect(res.verifyOutput).toBeNull();
   });
+
+  it('runs tests for every step file that has one', async () => {
+    await fs.writeFile(path.join(dir, 'src/b.ts'), 'x');
+    await fs.writeFile(path.join(dir, 'src/a.test.ts'), 'x');
+    await fs.writeFile(path.join(dir, 'src/b.test.ts'), 'x');
+    const res = await verifyStepNode(
+      mkState(dir, { testRunner: 'node -e "console.log(process.argv.slice(1).join(\' \'))" --' },
+        ['src/a.ts', 'src/b.ts'])
+    );
+    expect(res.lastError).toBeNull();
+    // last verified file's output retained
+    expect(res.verifyOutput).toContain('src/b.test.ts');
+  });
+
+  it('fails when a related test run fails', async () => {
+    await fs.writeFile(path.join(dir, 'src/a.test.ts'), 'x');
+    const res = await verifyStepNode(
+      mkState(dir, { testRunner: 'node -e "console.error(\'assertion failed\'); process.exit(1)" --' })
+    );
+    expect(res.lastError).toMatch(/Tests failed \(src\/a\.test\.ts\)/);
+    expect(res.verifyOutput).toContain('assertion failed');
+  });
+
+  it('returns null verifyOutput when testRunner configured but no tests exist', async () => {
+    const res = await verifyStepNode(mkState(dir, { testRunner: 'node -e "process.exit(0)"' }));
+    expect(res.lastError).toBeNull();
+    expect(res.verifyOutput).toBeNull();
+  });
 });
