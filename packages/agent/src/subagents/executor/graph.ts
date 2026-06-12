@@ -43,6 +43,7 @@ const afterApply = (state: ExecutorStateType): string =>
 const afterReview = (state: ExecutorStateType): string => {
   if (!state.currentStepId) return 'step_selector'; // done
   if (state.stepStates[state.currentStepId] === 'failed') return 'escalate';
+  if (!state.lastError) return 'step_selector'; // no retry reason — avoid ghost retry loop
   return 'mini_reader'; // retry
 };
 
@@ -97,6 +98,7 @@ export function createExecutorGraph() {
 
   // No checkpointer here: as a subgraph-node the parent's checkpointer is inherited,
   // which is what makes interrupt()/resume work through the root thread.
+  // NOTE: when invoked from the root graph, pass recursionLimit >= 75 — a multi-step plan with retries exceeds LangGraph's default of 25.
   return graph.compile();
 }
 

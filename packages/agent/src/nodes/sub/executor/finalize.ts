@@ -24,8 +24,7 @@ export const finalizeNode = (state: ExecutorStateType) => {
   return missing.length > 0 ? { stepResults: missing } : {};
 };
 
-// stepResults accumulate; a retried step appears multiple times (failed, then done).
-// Consumers must use the LAST entry per stepId.
+// A step that was escalated and later retried to success appears twice (failed, then done).
 export const dedupeStepResults = (results: StepResult[]): StepResult[] => {
   const byId = new Map<string, StepResult>();
   for (const r of results) byId.set(r.stepId, r);

@@ -38,7 +38,7 @@ export const ExecutorState = Annotation.Root({
     mergeRecord<Record<string, string | null>>()
   ),
   retryCounts: Annotation<Record<string, number>>(mergeRecord<number>()),
-  // nodes must read state.appliedOps[stepId], append, and return the full new array
+  // applyNode replaces this per attempt; the previous attempt's ops are discarded with the rollback
   appliedOps: Annotation<Record<string, string[]>>(mergeRecord<string[]>()),
   lastError: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   userGuidance: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),

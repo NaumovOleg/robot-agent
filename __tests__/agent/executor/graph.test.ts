@@ -8,6 +8,7 @@
 // recursionLimit: 100 passed on all invoke() calls — the default (25) is sufficient
 // for these test cases but 100 is passed preemptively per plan guidance.
 import { jest } from '@jest/globals';
+import { GraphValueError } from '@langchain/langgraph';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -65,6 +66,7 @@ describe('executor graph (mocked LLM)', () => {
     expect(result.stepResults).toHaveLength(1);
     expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done' });
     expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toContain('a = 2');
+    expect(llmQueue).toHaveLength(0);
   });
 
   it('retry path: bad anchor rolls back, second attempt succeeds', async () => {
@@ -84,6 +86,7 @@ describe('executor graph (mocked LLM)', () => {
 
     expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done', retries: 1 });
     expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toContain('a = 3');
+    expect(llmQueue).toHaveLength(0);
   });
 
   it('exhausted retries roll files back and escalate via interrupt', async () => {
@@ -94,8 +97,9 @@ describe('executor graph (mocked LLM)', () => {
       llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
     }
 
-    // Without a checkpointer, interrupt() in the escalate node throws GraphInterrupt
-    // to the caller — assert it escapes, then assert rollback happened.
+    // Without a checkpointer, interrupt() in the escalate node throws GraphValueError
+    // to the caller (LangGraph converts interrupt-without-checkpointer to GraphValueError)
+    // — assert it escapes, then assert rollback happened.
     await expect(
       createExecutorGraph().invoke({
         plan: plan([
@@ -103,7 +107,7 @@ describe('executor graph (mocked LLM)', () => {
         ]),
         context: null, cwd: dir, sessionId: 's',
       }, { recursionLimit: 100 })
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(GraphValueError);
 
     // every failed attempt was rolled back — file is pristine
     expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toBe('export const a = 1;\n');

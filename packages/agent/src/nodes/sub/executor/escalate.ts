@@ -53,8 +53,10 @@ export const escalateNode = (state: ExecutorStateType) => {
   debug('[executor/escalate]', stepId, '→', parsed.decision);
 
   if (parsed.decision === 'retry' && step) {
+    // lastError intentionally kept — mini_reader renders it as retry context
     return {
       escalationDecision: 'retry' as const,
+      currentStepId: stepId,
       userGuidance: parsed.guidance,
       retryCounts: { [stepId]: 0 },
       stepStates: { [stepId]: 'running' as StepStatus },

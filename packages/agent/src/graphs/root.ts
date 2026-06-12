@@ -30,7 +30,6 @@ export function buildGraph() {
     .addNode('planner', plannerNode)
     .addNode('question_node', askUserNode)
     .addNode('agent', rootAgentNode)
-
     .addEdge(START, 'context_node')
     .addEdge('context_node', 'pre_route')
     .addEdge('pre_route', 'router_intent')
