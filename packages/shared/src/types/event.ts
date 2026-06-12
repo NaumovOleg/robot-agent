@@ -1,5 +1,6 @@
 import type { Session } from './session';
 import type { ClarificationSource } from './agent';
+import type { ExecutorHint } from '../schemas/executor/types';
 
 export interface AppEvents {
   'user:message': { sessionId: string; content: string };
@@ -77,13 +78,14 @@ export interface AppEvents {
     sessionId: string;
     stepId: string;
     file: string;
-    op: string;
+    op: ExecutorHint['op'];
     diff: string;
   };
-  'executor:verify': {
+  'executor:step:verify': {
     sessionId: string;
     stepId: string;
     command: string;
     ok: boolean;
+    output?: string;
   };
 }

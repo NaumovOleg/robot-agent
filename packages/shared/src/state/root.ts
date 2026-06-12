@@ -33,6 +33,7 @@ export const RootState = Annotation.Root({
   plan: Annotation<PlannerOutput | null>({ reducer: (_, n) => n, default: () => null }),
   planApproved: Annotation<boolean | null>({ reducer: (_, n) => n, default: () => null }),
   // written back by the executor subgraph at finalize
+  // nodes MUST return only NEW items (delta); the reducer appends them
   stepResults: Annotation<StepResult[]>({
     reducer: (prev, next) => prev.concat(next),
     default: () => [],
