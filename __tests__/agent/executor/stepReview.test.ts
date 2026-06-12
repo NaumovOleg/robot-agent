@@ -1,4 +1,5 @@
 import { decideStepOutcome } from '../../../packages/agent/src/nodes/sub/executor/stepReview';
+import { MAX_STEP_RETRIES } from '../../../packages/agent/src/subagents/executor/state';
 
 describe('decideStepOutcome', () => {
   it('sufficient → done', () => {
@@ -7,11 +8,11 @@ describe('decideStepOutcome', () => {
 
   it('insufficient under the retry cap → retry', () => {
     expect(decideStepOutcome('insufficient', 0)).toBe('retry');
-    expect(decideStepOutcome('insufficient', 1)).toBe('retry');
+    expect(decideStepOutcome('insufficient', MAX_STEP_RETRIES - 1)).toBe('retry');
   });
 
   it('insufficient at the cap → failed', () => {
-    expect(decideStepOutcome('insufficient', 2)).toBe('failed');
+    expect(decideStepOutcome('insufficient', MAX_STEP_RETRIES)).toBe('failed');
   });
 
   it('blocked → failed immediately regardless of retries', () => {

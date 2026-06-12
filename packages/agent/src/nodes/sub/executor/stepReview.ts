@@ -52,11 +52,17 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       status = review.status;
       reason = review.reason;
     } catch (err) {
-      // Judge failed → fall back to verification verdict: no lastError means
-      // the cheap tiers passed; accept rather than loop on infra errors.
-      debug('[executor/step_review] judge LLM failed, accepting on verification', err);
-      status = 'sufficient';
-      reason = 'Verification passed; review LLM unavailable.';
+      const verificationRan = !!(state.verifyCommands.typeCheck || state.verifyCommands.testRunner);
+      if (verificationRan) {
+        // cheap tiers passed (no lastError) — accept rather than loop on infra errors
+        debug('[executor/step_review] judge LLM failed, accepting on verification', err);
+        status = 'sufficient';
+        reason = 'Verification passed; review LLM unavailable.';
+      } else {
+        debug('[executor/step_review] judge LLM failed, no verification configured', err);
+        status = 'insufficient';
+        reason = `Review LLM unavailable and no verification was configured: ${String(err).slice(0, 200)}`;
+      }
     }
   }
 
@@ -90,6 +96,7 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       retryCounts: { [currentStepId]: retries + 1 },
       lastError: reason,
       currentHints: [],
+      verifyOutput: null,
     };
   }
 
@@ -105,5 +112,6 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     stepResults: [result],
     lastError: reason,
     currentHints: [],
+    verifyOutput: null,
   };
 };
