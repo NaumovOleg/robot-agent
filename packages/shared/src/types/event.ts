@@ -59,4 +59,31 @@ export interface AppEvents {
   'agent:compact_complete': { sessionId: string; originalCount: number };
   'agent:question': { sessionId: string; question: string; source: ClarificationSource | null };
   'agent:answer': { sessionId: string; answer: string; source: ClarificationSource | null };
+
+  'executor:step:start': {
+    sessionId: string;
+    stepId: string;
+    title: string;
+    index: number;
+    total: number;
+  };
+  'executor:step:done': {
+    sessionId: string;
+    stepId: string;
+    status: 'done' | 'failed' | 'skipped';
+    retries: number;
+  };
+  'executor:edit:applied': {
+    sessionId: string;
+    stepId: string;
+    file: string;
+    op: string;
+    diff: string;
+  };
+  'executor:verify': {
+    sessionId: string;
+    stepId: string;
+    command: string;
+    ok: boolean;
+  };
 }

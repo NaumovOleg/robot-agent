@@ -298,6 +298,7 @@ export const cleanContext = (ctx: DirtyWorkspaceContext): WorkspaceContext => ({
     primary: ctx.language.primary,
     linter: ctx.language.linter?.runCommand,
     typeCheck: ctx.language.buildTool?.typeCheckCommand,
+    testRunner: ctx.language.testRunner?.runCommand,
     build: ctx.language.buildTool?.buildCommand,
     packageManager:
       ctx.language.packageManager?.name !== 'unknown'

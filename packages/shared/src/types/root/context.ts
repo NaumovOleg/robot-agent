@@ -112,6 +112,7 @@ export interface WorkspaceContext {
     primary: SupportedLanguage;
     linter?: string;
     typeCheck?: string | null;
+    testRunner?: string | null;
     build?: string;
     packageManager?: string;
     aliases?: { name: string; path: string }[];
