@@ -29,6 +29,10 @@ export const ExecutorHintSchema = z.object({
   newSymbol: z.string().nullable().optional(),
   anchor: z.string().nullable().optional(),
   newContent: z.string().nullable().optional(),
+  // rename_file destination, repo-relative
+  target: z.string().nullable().optional(),
+  // insert_text placement relative to anchor; defaults to 'after'
+  insertMode: z.enum(['before', 'after', 'start', 'end']).nullable().optional(),
 });
 export type ExecutorHint = z.infer<typeof ExecutorHintSchema>;
 
@@ -40,3 +44,20 @@ export const StepReviewOutputSchema = z.object({
   status: StepReviewStatusSchema,
   reason: z.string(),
 });
+
+// ─── Executor runtime types ───────────────────────────────────────────────────
+
+export interface ReaderDigest {
+  stepId: string;
+  summary: string;
+  keyFindings: { file: string; lines: string; content: string; comment: string }[];
+  operationHints: unknown[];
+}
+
+export type EscalationDecision = 'skip' | 'retry' | 'abort';
+
+export interface VerifyCommands {
+  typeCheck: string | null;
+  testRunner: string | null;
+  lint: string | null;
+}
