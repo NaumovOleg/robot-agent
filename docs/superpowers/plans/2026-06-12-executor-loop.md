@@ -379,7 +379,7 @@ In `packages/shared/src/types/event.ts`, append inside the interface:
     op: string;
     diff: string;
   };
-  'executor:verify': {
+  'executor:step:verify': {
     sessionId: string;
     stepId: string;
     command: string;
@@ -1735,7 +1735,7 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
   if (verifyCommands.typeCheck) {
     const result = await runCommand(verifyCommands.typeCheck, cwd);
     const failed = !result.ok || /error TS\d+|error\[|error:/.test(result.output);
-    EventBus.emit('executor:verify', {
+    EventBus.emit('executor:step:verify', {
       sessionId, stepId: currentStepId, command: verifyCommands.typeCheck, ok: !failed,
     });
     if (failed) {
@@ -1754,7 +1754,7 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
       if (!testFile) continue;
       const cmd = `${verifyCommands.testRunner} ${testFile}`;
       const result = await runCommand(cmd, cwd);
-      EventBus.emit('executor:verify', {
+      EventBus.emit('executor:step:verify', {
         sessionId, stepId: currentStepId, command: cmd, ok: result.ok,
       });
       if (!result.ok) {
@@ -2820,7 +2820,7 @@ Inside the same `useEffect` that registers `EventBus.on('llm:token', …)` etc. 
           { kind: 'system', id: makeId(), content: `✎ ${file} (${op})` },
         ]);
       }),
-      EventBus.on('executor:verify', ({ sessionId, command, ok }) => {
+      EventBus.on('executor:step:verify', ({ sessionId, command, ok }) => {
         if (sessionId !== id) return;
         setThinkingPhrase(ok ? 'Verifying… ok' : 'Verifying… failed');
         void command;
