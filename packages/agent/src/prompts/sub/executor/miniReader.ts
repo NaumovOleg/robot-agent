@@ -1,0 +1,89 @@
+import type { PlannerOutput, ReaderDigest } from '@robocode-packages/shared';
+
+type PlanStep = PlannerOutput['steps'][number];
+
+export interface MiniReaderPromptInput {
+  step: PlanStep;
+  goal: string;
+  constraints: string[];
+  files: { file: string; content: string }[];
+  findings: ReaderDigest[];
+  lastError: string | null;
+  userGuidance: string | null;
+  appliedOps: string[];
+}
+
+const MAX_FILE_CHARS = 30_000;
+
+export const withLineNumbers = (content: string): string =>
+  content
+    .split('\n')
+    .map((line, i) => `${i + 1} | ${line}`)
+    .join('\n');
+
+export const buildMiniReaderPrompt = (input: MiniReaderPromptInput): string => {
+  const { step, goal, constraints, files, findings, lastError, userGuidance, appliedOps } = input;
+
+  const fileBlocks = files
+    .map(({ file, content }) => {
+      const clipped =
+        content.length > MAX_FILE_CHARS
+          ? content.slice(0, MAX_FILE_CHARS) + '\n…[truncated]'
+          : content;
+      return `### ${file}\n\`\`\`\n${withLineNumbers(clipped)}\n\`\`\``;
+    })
+    .join('\n\n');
+
+  const findingBlocks = findings
+    .map((digest) => {
+      const keyFindings = digest.keyFindings
+        .map((f) => `- ${f.file}:${f.lines} — ${f.comment}\n\`\`\`\n${f.content}\n\`\`\``)
+        .join('\n');
+      return `### From step "${digest.stepId}"\n${digest.summary}\n${keyFindings}`;
+    })
+    .join('\n\n');
+
+  const retryBlock = lastError
+    ? `
+## PREVIOUS ATTEMPT FAILED
+The files have been ROLLED BACK to their pre-attempt state. Produce a corrected set of hints.
+
+Error:
+${lastError}
+
+Operations the failed attempt applied (now reverted):
+${appliedOps.map((op) => `- ${op}`).join('\n') || '- none'}
+${userGuidance ? `\nUser guidance:\n${userGuidance}` : ''}`
+    : '';
+
+  return `You are the edit generator inside a code-editing loop. Produce a minimal ordered list of atomic edit hints that implement ONE plan step. The hints are applied MECHANICALLY in order — no human or model fixes them afterwards.
+
+## Plan goal
+${goal}
+
+## Current step
+id: ${step.id}
+kind: ${step.kind}
+title: ${step.title}
+expected output: ${step.expected_output}
+files: ${step.files.join(', ') || '(none listed)'}
+
+## Hard constraints
+${constraints.map((c) => `- ${c}`).join('\n') || '- none'}
+
+## Investigation findings (from inspect steps)
+${findingBlocks || '(none)'}
+
+## Current file contents (fresh from disk, line-numbered)
+${fileBlocks || '(no existing files — this step creates new ones)'}
+${retryBlock}
+
+## Output rules
+- "anchor" must be a VERBATIM substring copied from the file content above (without the "N | " line-number prefix) and must occur exactly once in the file.
+- "newContent" is the complete replacement/insertion text — real code, correct indentation, no placeholders.
+- For create_file, "newContent" is the entire file content.
+- For insert_text, set "insertMode" (before|after|start|end); the default is "after".
+- For rename_file, set "target" to the new repo-relative path.
+- Prefer replace_text with a tight unique anchor over AST ops unless renaming a symbol.
+- Do not touch files outside the step's scope unless strictly required by the expected output.`;
+};

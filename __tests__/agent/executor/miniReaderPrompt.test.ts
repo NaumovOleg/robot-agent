@@ -1,0 +1,40 @@
+import { buildMiniReaderPrompt } from '../../../packages/agent/src/prompts/sub/executor/miniReader';
+
+const step = {
+  id: 'edit-a', kind: 'edit' as const, title: 'Add salute()', files: ['src/a.ts'],
+  depends_on: ['inspect-a'], expected_output: 'salute exported; tsc clean',
+};
+
+describe('buildMiniReaderPrompt', () => {
+  it('includes step, goal, constraints, file contents with line numbers, findings', () => {
+    const prompt = buildMiniReaderPrompt({
+      step,
+      goal: 'Add greeting feature',
+      constraints: ['do not change public API'],
+      files: [{ file: 'src/a.ts', content: 'line one\nline two' }],
+      findings: [{ stepId: 'inspect-a', summary: 'a.ts exports greet()', keyFindings: [], operationHints: [] }],
+      lastError: null,
+      userGuidance: null,
+      appliedOps: [],
+    });
+    expect(prompt).toContain('Add salute()');
+    expect(prompt).toContain('Add greeting feature');
+    expect(prompt).toContain('do not change public API');
+    expect(prompt).toContain('1 | line one');
+    expect(prompt).toContain('a.ts exports greet()');
+    expect(prompt).not.toContain('PREVIOUS ATTEMPT FAILED');
+  });
+
+  it('includes retry context when lastError is present', () => {
+    const prompt = buildMiniReaderPrompt({
+      step, goal: 'g', constraints: [], files: [], findings: [],
+      lastError: 'Type check failed: error TS2304',
+      userGuidance: 'use the existing helper',
+      appliedOps: ['replace_text src/a.ts'],
+    });
+    expect(prompt).toContain('PREVIOUS ATTEMPT FAILED');
+    expect(prompt).toContain('error TS2304');
+    expect(prompt).toContain('use the existing helper');
+    expect(prompt).toContain('replace_text src/a.ts');
+  });
+});
