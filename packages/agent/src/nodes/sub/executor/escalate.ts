@@ -44,7 +44,7 @@ export const escalateNode = (state: ExecutorStateType) => {
   const question =
     `Executor step "${step?.title ?? stepId}" failed:\n${lastError ?? 'unknown error'}\n\n` +
     `Reply "skip" to skip this step (dependent steps will be skipped too), ` +
-    `"abort" to stop the executor, or type guidance to retry with your hint.`;
+    `"abort" (or "stop") to stop the executor, or type guidance to retry with your hint.`;
 
   EventBus.emit('agent:question', { sessionId, question, source: 'executor' });
   const answer: string = interrupt(question);
@@ -58,7 +58,6 @@ export const escalateNode = (state: ExecutorStateType) => {
       userGuidance: parsed.guidance,
       retryCounts: { [stepId]: 0 },
       stepStates: { [stepId]: 'running' as StepStatus },
-      lastError: state.lastError, // keep error context for the retry prompt
     };
   }
 
@@ -86,6 +85,10 @@ export const escalateNode = (state: ExecutorStateType) => {
       lastError: null,
       userGuidance: null,
     };
+  }
+
+  if (parsed.decision !== 'abort') {
+    debug('[executor/escalate] fallthrough to abort (no valid step for decision:', parsed.decision, ', stepId:', stepId, ')');
   }
 
   return { escalationDecision: 'abort' as const, currentStepId: null };

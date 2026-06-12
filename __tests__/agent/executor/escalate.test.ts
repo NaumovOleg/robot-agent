@@ -2,12 +2,17 @@ import {
   parseEscalationAnswer,
   collectDependents,
 } from '../../../packages/agent/src/nodes/sub/executor/escalate';
+import { dedupeStepResults } from '../../../packages/agent/src/nodes/sub/executor/finalize';
 import { digestReaderOutput } from '../../../packages/agent/src/nodes/sub/executor/readerStep';
 
 describe('parseEscalationAnswer', () => {
   it('recognizes skip and abort keywords', () => {
     expect(parseEscalationAnswer('skip')).toEqual({ decision: 'skip', guidance: null });
     expect(parseEscalationAnswer(' Abort ')).toEqual({ decision: 'abort', guidance: null });
+  });
+
+  it('recognizes stop as abort', () => {
+    expect(parseEscalationAnswer('stop')).toEqual({ decision: 'abort', guidance: null });
   });
 
   it('treats anything else as retry with guidance', () => {
@@ -31,6 +36,18 @@ describe('collectDependents', () => {
   });
   it('returns empty for a leaf', () => {
     expect(collectDependents(steps as never, 'd')).toEqual([]);
+  });
+});
+
+describe('dedupeStepResults', () => {
+  it('keeps the last entry per stepId', () => {
+    const out = dedupeStepResults([
+      { stepId: 'a', status: 'failed', output: 'x', retries: 2 },
+      { stepId: 'b', status: 'done', output: 'y', retries: 0 },
+      { stepId: 'a', status: 'done', output: 'z', retries: 0 },
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.stepId === 'a')?.status).toBe('done');
   });
 });
 
