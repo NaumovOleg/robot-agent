@@ -1,0 +1,111 @@
+// Integration test for the executor subgraph.
+// Mocking strategy: jest.unstable_mockModule + dynamic await import (ESM pattern).
+// Mock path: '../../../packages/agent/src/utils/model' — the model module that both
+// miniReaderNode and stepReviewNode import via the utils barrel. If this does not
+// intercept (LLM error in test), fall back to mocking the barrel path
+// '../../../packages/agent/src/utils'.
+//
+// recursionLimit: 100 passed on all invoke() calls — the default (25) is sufficient
+// for these test cases but 100 is passed preemptively per plan guidance.
+import { jest } from '@jest/globals';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+// queue of structured outputs returned by mocked withStructuredOutput().invoke()
+const llmQueue: unknown[] = [];
+
+jest.unstable_mockModule('../../../packages/agent/src/utils/model', () => ({
+  createBaseModel: jest.fn(),
+  getModel: jest.fn(() => ({
+    withStructuredOutput: () => ({
+      invoke: async () => {
+        if (llmQueue.length === 0) throw new Error('llmQueue empty');
+        return llmQueue.shift();
+      },
+    }),
+  })),
+}));
+
+const { createExecutorGraph } = await import(
+  '../../../packages/agent/src/subagents/executor/graph'
+);
+
+const plan = (steps: unknown[]) => ({
+  goal: 'test goal', clarifying_questions: [], risk: 'low', assumptions: [],
+  constraints: [], files_affected: ['src/a.ts'], gitStep: null, steps,
+});
+
+describe('executor graph (mocked LLM)', () => {
+  let dir: string;
+  beforeEach(async () => {
+    llmQueue.length = 0;
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'rc-graph-'));
+    await fs.mkdir(path.join(dir, 'src'), { recursive: true });
+    await fs.writeFile(path.join(dir, 'src/a.ts'), 'export const a = 1;\n');
+  });
+  afterEach(async () => fs.rm(dir, { recursive: true, force: true }));
+
+  it('happy path: edit step applies hints, reviews sufficient, finishes done', async () => {
+    llmQueue.push(
+      // mini_reader output
+      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 2;' }] },
+      // step_review output
+      { status: 'sufficient', reason: 'value updated' }
+    );
+
+    const graph = createExecutorGraph();
+    const result = await graph.invoke({
+      plan: plan([
+        { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'a === 2' },
+      ]),
+      context: null, cwd: dir, sessionId: 's',
+    }, { recursionLimit: 100 });
+
+    expect(result.stepResults).toHaveLength(1);
+    expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done' });
+    expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toContain('a = 2');
+  });
+
+  it('retry path: bad anchor rolls back, second attempt succeeds', async () => {
+    llmQueue.push(
+      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG ANCHOR', newContent: 'x' }] }, // attempt 1 → apply fails
+      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 3;' }] }, // attempt 2
+      { status: 'sufficient', reason: 'ok' } // review of attempt 2
+    );
+
+    const graph = createExecutorGraph();
+    const result = await graph.invoke({
+      plan: plan([
+        { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'a === 3' },
+      ]),
+      context: null, cwd: dir, sessionId: 's',
+    }, { recursionLimit: 100 });
+
+    expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done', retries: 1 });
+    expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toContain('a = 3');
+  });
+
+  it('exhausted retries roll files back and escalate via interrupt', async () => {
+    // 3 failing attempts (initial + 2 retries), each consumes one mini_reader output.
+    // step_review short-circuits (no LLM call) when lastError is set, so no
+    // review outputs are needed in the queue.
+    for (let i = 0; i < 3; i++) {
+      llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
+    }
+
+    // Without a checkpointer, interrupt() in the escalate node throws GraphInterrupt
+    // to the caller — assert it escapes, then assert rollback happened.
+    await expect(
+      createExecutorGraph().invoke({
+        plan: plan([
+          { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'x' },
+        ]),
+        context: null, cwd: dir, sessionId: 's',
+      }, { recursionLimit: 100 })
+    ).rejects.toThrow();
+
+    // every failed attempt was rolled back — file is pristine
+    expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toBe('export const a = 1;\n');
+  });
+});
