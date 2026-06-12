@@ -109,4 +109,56 @@ describe('dispatchHint', () => {
       dispatchHint(hint({ op: 'replace_text', file: 'a.ts', anchor: null, newContent: 'x' }), dir)
     ).rejects.toThrow(/anchor.*required/i);
   });
+
+  it('replace_node replaces the node body', async () => {
+    await dispatchHint(
+      hint({ op: 'replace_node', file: 'a.ts', nodeType: 'variable_declarator', symbol: 'greet',
+             newContent: 'const greet = () => "replaced"' }),
+      dir
+    );
+    const content = await read('a.ts');
+    expect(content).toContain('"replaced"');
+    expect(content).not.toContain('"hi"');
+  });
+
+  it('remove_node removes the node', async () => {
+    await dispatchHint(
+      hint({ op: 'remove_node', file: 'a.ts', nodeType: 'variable_declarator', symbol: 'greet' }),
+      dir
+    );
+    expect(await read('a.ts')).not.toContain('greet');
+  });
+
+  it('insert_node appends snippet to end of file', async () => {
+    await dispatchHint(
+      hint({ op: 'insert_node', file: 'a.ts', nodeType: 'function_declaration',
+             newContent: 'export const extra = 1;' }),
+      dir
+    );
+    expect((await read('a.ts')).trimEnd().endsWith('export const extra = 1;')).toBe(true);
+  });
+
+  it('insert_text start mode needs no anchor', async () => {
+    await dispatchHint(
+      hint({ op: 'insert_text', file: 'a.ts', insertMode: 'start', newContent: '// header\n' }),
+      dir
+    );
+    expect((await read('a.ts')).startsWith('// header\n')).toBe(true);
+  });
+
+  it('insert_text end mode appends', async () => {
+    await dispatchHint(
+      hint({ op: 'insert_text', file: 'a.ts', insertMode: 'end', newContent: '// footer\n' }),
+      dir
+    );
+    expect((await read('a.ts')).endsWith('// footer\n')).toBe(true);
+  });
+
+  it('replace_text fails on ambiguous anchor', async () => {
+    await fs.writeFile(path.join(dir, 'a.ts'), 'let x = 1;\nlet x2 = 1;\n'.replace('x2', 'y') + 'let z = 1;\n');
+    // ensure substring "= 1;" appears multiple times
+    await expect(
+      dispatchHint(hint({ op: 'replace_text', file: 'a.ts', anchor: '= 1;', newContent: '= 2;' }), dir)
+    ).rejects.toThrow(/Expected unique target/);
+  });
 });

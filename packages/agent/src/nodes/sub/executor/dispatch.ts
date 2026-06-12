@@ -31,7 +31,7 @@ const resolveInside = (cwd: string, file: string): string => {
   return abs;
 };
 
-const require_ = <T>(value: T | null | undefined, field: string, op: string): T => {
+const requireField = <T>(value: T | null | undefined, field: string, op: string): T => {
   if (value == null || value === '') {
     throw new Error(`[executor/dispatch] ${field} is required for op "${op}"`);
   }
@@ -41,22 +41,22 @@ const require_ = <T>(value: T | null | undefined, field: string, op: string): T 
 const astEditFromHint = (hint: ExecutorHint, action: AstEdit['action']): AstEdit => ({
   mode: 'ast',
   action,
-  nodeType: require_(hint.nodeType, 'nodeType', hint.op),
+  nodeType: requireField(hint.nodeType, 'nodeType', hint.op),
   symbol: hint.symbol ?? null,
   newSymbol: hint.newSymbol ?? null,
   parentNodeType: null,
-  afterSnippet: hint.newContent ?? null,
-  insertSnippet: hint.newContent ?? null,
+  afterSnippet: action === 'replace' ? hint.newContent ?? null : null,
+  insertSnippet: action === 'insert' ? hint.newContent ?? null : null,
   beforeSnippet: null,
   reasoning: '',
   file: hint.file,
   lines: null,
 });
 
-const writeAndCheck = async (abs: string, file: string, content: string): Promise<void> => {
+const writeAndCheck = async (abs: string, content: string): Promise<void> => {
   await fs.writeFile(abs, content, 'utf-8');
   const syntax = await checkSyntax(abs, content);
-  if (!syntax.ok) throw new Error(syntax.error);
+  if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
 };
 
 // Applies one hint mechanically. Reads the file fresh from disk (previous hints
@@ -71,12 +71,12 @@ export const dispatchHint = async (
   // ── file-level ops (no content read) ────────────────────────────────────────
   if (op === 'create_file') {
     resolveInside(cwd, hint.file);
-    const content = require_(hint.newContent, 'newContent', op);
+    const content = requireField(hint.newContent, 'newContent', op);
     const { absPath } = await applyFileInsert(cwd, {
       mode: 'file', action: 'insert', file: hint.file, insertText: content, reasoning: '',
     });
     const syntax = await checkSyntax(absPath, content);
-    if (!syntax.ok) throw new Error(syntax.error);
+    if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
     return { file: hint.file, summary: `create_file ${hint.file}` };
   }
 
@@ -88,7 +88,7 @@ export const dispatchHint = async (
 
   if (op === 'rename_file') {
     resolveInside(cwd, hint.file);
-    const target = require_(hint.target, 'target', op);
+    const target = requireField(hint.target, 'target', op);
     resolveInside(cwd, target);
     await applyFileRename(cwd, {
       mode: 'file', action: 'rename', file: hint.file, target, reasoning: '',
@@ -108,11 +108,11 @@ export const dispatchHint = async (
   let next: string;
 
   if (op === 'replace_text') {
-    const anchor = require_(hint.anchor, 'anchor', op);
+    const anchor = requireField(hint.anchor, 'anchor', op);
     next = applyTextReplace(content, {
       mode: 'text', action: 'replace', file: hint.file,
       anchor: { type: 'exact', value: anchor },
-      replaceWith: require_(hint.newContent, 'newContent', op),
+      replaceWith: requireField(hint.newContent, 'newContent', op),
       reasoning: '',
     });
   } else if (op === 'insert_text') {
@@ -120,16 +120,16 @@ export const dispatchHint = async (
     const anchor =
       insertMode === 'start' || insertMode === 'end'
         ? (hint.anchor ?? '')
-        : require_(hint.anchor, 'anchor', op);
+        : requireField(hint.anchor, 'anchor', op);
     next = applyTextInsert(content, {
       mode: 'text', action: 'insert', file: hint.file,
       anchor: { type: 'exact', value: anchor },
       insertMode,
-      insertText: require_(hint.newContent, 'newContent', op),
+      insertText: requireField(hint.newContent, 'newContent', op),
       reasoning: '',
     });
   } else if (op === 'remove_text') {
-    const anchor = require_(hint.anchor, 'anchor', op);
+    const anchor = requireField(hint.anchor, 'anchor', op);
     next = applyTextDelete(content, {
       mode: 'text', action: 'remove', file: hint.file,
       anchor: { type: 'exact', value: anchor },
@@ -137,7 +137,7 @@ export const dispatchHint = async (
       reasoning: '',
     });
   } else if (op === 'insert_node') {
-    require_(hint.newContent, 'newContent', op);
+    requireField(hint.newContent, 'newContent', op);
     next = applyAstInsert(content, astEditFromHint(hint, 'insert'));
   } else {
     // replace_node | remove_node | rename_symbol — need a parsed tree
@@ -146,19 +146,19 @@ export const dispatchHint = async (
     if (!tree) throw new Error(`[executor/dispatch] Cannot parse ${hint.file}`);
 
     if (op === 'replace_node') {
-      require_(hint.newContent, 'newContent', op);
+      requireField(hint.newContent, 'newContent', op);
       next = applyAstReplace(content, astEditFromHint(hint, 'replace'), tree);
     } else if (op === 'remove_node') {
       next = applyAstRemove(content, astEditFromHint(hint, 'remove'), tree);
     } else if (op === 'rename_symbol') {
-      require_(hint.symbol, 'symbol', op);
-      require_(hint.newSymbol, 'newSymbol', op);
+      requireField(hint.symbol, 'symbol', op);
+      requireField(hint.newSymbol, 'newSymbol', op);
       next = applyAstRename(content, astEditFromHint(hint, 'rename'), tree);
     } else {
       throw new Error(`[executor/dispatch] Unknown op: ${op}`);
     }
   }
 
-  await writeAndCheck(abs, hint.file, next);
+  await writeAndCheck(abs, next);
   return { file: hint.file, summary: `${op} ${hint.file}` };
 };
