@@ -4,9 +4,14 @@ import type { ExecutorStateType } from '../../../subagents/executor/state';
 import { dispatchHint } from './dispatch';
 import { takeSnapshot } from './snapshots';
 
-const hintDiff = (op: string, anchor: string | null | undefined, newContent: string | null | undefined): string => {
-  const removed = anchor ? `- ${anchor.slice(0, 200)}` : '';
+const hintDiff = (
+  op: string,
+  anchor: string | null | undefined,
+  newContent: string | null | undefined
+): string => {
   const added = newContent ? `+ ${newContent.slice(0, 400)}` : '';
+  if (op === 'insert_text') return added || op; // anchor is position, not removed text
+  const removed = anchor ? `- ${anchor.slice(0, 200)}` : '';
   return [removed, added].filter(Boolean).join('\n') || op;
 };
 
@@ -39,7 +44,9 @@ export const applyNode = async (state: ExecutorStateType) => {
         stepId: currentStepId,
         file: result.file,
         op: hint.op,
-        diff: hintDiff(hint.op, hint.anchor, hint.newContent),
+        diff: hint.op === 'rename_file' && hint.target
+          ? `${hint.file} → ${hint.target}`
+          : hintDiff(hint.op, hint.anchor, hint.newContent),
       });
     } catch (err) {
       const message = `hint ${i + 1}/${currentHints.length} (${hint.op} ${hint.file}): ${String(

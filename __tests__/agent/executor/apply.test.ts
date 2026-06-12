@@ -51,6 +51,15 @@ describe('applyNode', () => {
     expect(res.fileSnapshots?.['edit-a']?.['a.ts']).toBe('PRISTINE');
   });
 
+  it('snapshots a delete_file target before deletion', async () => {
+    const res = await applyNode(
+      mkState(dir, [hint({ op: 'delete_file', file: 'a.ts' })])
+    );
+    expect(res.lastError).toBeNull();
+    expect(res.fileSnapshots?.['edit-a']?.['a.ts']).toBe('const a = 1;\n');
+    await expect(fs.access(path.join(dir, 'a.ts'))).rejects.toThrow();
+  });
+
   it('stops at the first failing hint and reports which one', async () => {
     const res = await applyNode(
       mkState(dir, [
