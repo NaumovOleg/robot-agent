@@ -23,13 +23,19 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
       output: failed ? introduced.join('\n').slice(-TAIL) : undefined,
     });
     if (failed) {
-      debug('[executor/verify] typeCheck introduced', introduced.length, 'new errors');
+      debug(
+        '[executor/verify]',
+        currentStepId,
+        `typeCheck introduced ${introduced.length} NEW error(s):`,
+        introduced.map((e) => `\n    ✗ ${e}`).join('')
+      );
       const detail = introduced.join('\n');
       return {
         lastError: `Type check failed — new errors introduced by this edit:\n${tail(detail)}`,
         verifyOutput: tail(detail),
       };
     }
+    debug('[executor/verify]', currentStepId, 'typeCheck OK (no new errors)');
   }
 
   // Tier 2b: related test files only — never the whole suite

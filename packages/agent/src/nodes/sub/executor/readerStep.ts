@@ -64,6 +64,13 @@ export const readerStepNode = async (state: ExecutorStateType) => {
   // 'sufficient' and 'insufficient' both produce usable findings; unresolved
   // questions surface to the mini-reader through the digest summary.
   const digest = digestReaderOutput(currentStepId, output);
+  debug(
+    '[executor/reader_step]',
+    currentStepId,
+    `done (status=${output.status}, ${digest.keyFindings.length} finding(s)):`,
+    '\n  summary:',
+    output.summary.replace(/\s+/g, ' ').trim().slice(0, 300)
+  );
   EventBus.emit('executor:step:done', { sessionId, stepId: currentStepId, status: 'done', retries });
   const result: StepResult = {
     stepId: currentStepId,

@@ -67,7 +67,13 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
   }
 
   const outcome = decideStepOutcome(status, retries);
-  debug('[executor/step_review]', currentStepId, status, '→', outcome, `(retries=${retries})`);
+  debug(
+    '[executor/step_review]',
+    currentStepId,
+    `verdict=${status} → ${outcome} (retries=${retries})`,
+    '\n  reason:',
+    reason.replace(/\s+/g, ' ').trim().slice(0, 300)
+  );
 
   if (outcome === 'done') {
     const result: StepResult = {

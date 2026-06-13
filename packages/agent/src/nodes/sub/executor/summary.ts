@@ -1,0 +1,59 @@
+import { debug } from '@robocode-packages/shared';
+import type { ExecutorHint } from '@robocode-packages/shared';
+import type { ExecutorStateType } from '../../../subagents/executor/state';
+
+const clip = (s: string, n = 60): string => {
+  const oneLine = s.replace(/\s+/g, ' ').trim();
+  return oneLine.length > n ? oneLine.slice(0, n) + '…' : oneLine;
+};
+
+// One-line, human-readable description of an edit hint for the debug log.
+export const summarizeHint = (h: ExecutorHint): string => {
+  switch (h.op) {
+    case 'rename_symbol':
+      return `rename_symbol ${h.file} ${h.symbol}→${h.newSymbol}`;
+    case 'rename_file':
+      return `rename_file ${h.file}→${h.target}`;
+    case 'replace_node':
+    case 'remove_node':
+    case 'insert_node':
+      return `${h.op} ${h.file} <${h.nodeType ?? '?'}${h.symbol ? ` ${h.symbol}` : ''}>`;
+    case 'replace_text':
+    case 'remove_text':
+    case 'insert_text':
+      return `${h.op} ${h.file} @"${clip(h.anchor ?? '', 40)}"`;
+    case 'create_file':
+    case 'delete_file':
+      return `${h.op} ${h.file}`;
+    default:
+      return `${h.op} ${h.file}`;
+  }
+};
+
+export const summarizeHints = (hints: ExecutorHint[]): string =>
+  hints.map((h, i) => `\n    ${i + 1}. ${summarizeHint(h)}`).join('');
+
+// Compact snapshot of the loop's progress: per-step status, the current step,
+// and any retry counts. Printed at the top of each iteration so the debug log
+// reads like a state machine trace.
+export const summarizeState = (state: ExecutorStateType): string => {
+  const states = (state.plan?.steps ?? [])
+    .map((s) => `${s.id}:${state.stepStates[s.id] ?? 'pending'}`)
+    .join(', ');
+  const retries = Object.entries(state.retryCounts)
+    .filter(([, n]) => n > 0)
+    .map(([id, n]) => `${id}=${n}`)
+    .join(', ');
+  return `current=${state.currentStepId ?? '—'} | steps={${states}}${retries ? ` | retries={${retries}}` : ''}`;
+};
+
+// Wraps an executor graph node so every entry logs the node name and the live
+// state snapshot. Gives the debug log a node-by-node trace of the loop's flow
+// (init → step_selector → mini_reader → apply → verify_step → step_review → …).
+// Generic over the node's return type so addNode's overloads still resolve.
+export const traceExecutorNode =
+  <R>(name: string, fn: (state: ExecutorStateType) => R): ((state: ExecutorStateType) => R) =>
+  (state) => {
+    debug(`[graph/executor] → ${name.padEnd(14)} ${summarizeState(state)}`);
+    return fn(state);
+  };

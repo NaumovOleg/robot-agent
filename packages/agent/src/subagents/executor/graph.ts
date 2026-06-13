@@ -13,6 +13,7 @@ import {
   finalizeNode,
   hasDestructiveHints,
 } from '../../nodes/sub/executor';
+import { traceExecutorNode } from '../../nodes/sub/executor/summary';
 import { ExecutorState } from './state';
 import type { ExecutorStateType } from './state';
 
@@ -61,16 +62,16 @@ const afterEscalate = (state: ExecutorStateType): string => {
 // the root thread). Passing one here would give it a separate persistence scope.
 export function createExecutorGraph(checkpointer?: BaseCheckpointSaver) {
   const graph = new StateGraph(ExecutorState)
-    .addNode('init', initNode)
-    .addNode('step_selector', stepSelectorNode)
-    .addNode('reader_step', readerStepNode)
-    .addNode('mini_reader', miniReaderNode)
-    .addNode('approval_gate', approvalGateNode)
-    .addNode('apply', applyNode)
-    .addNode('verify_step', verifyStepNode)
-    .addNode('step_review', stepReviewNode)
-    .addNode('escalate', escalateNode)
-    .addNode('finalize', finalizeNode)
+    .addNode('init', traceExecutorNode('init', initNode))
+    .addNode('step_selector', traceExecutorNode('step_selector', stepSelectorNode))
+    .addNode('reader_step', traceExecutorNode('reader_step', readerStepNode))
+    .addNode('mini_reader', traceExecutorNode('mini_reader', miniReaderNode))
+    .addNode('approval_gate', traceExecutorNode('approval_gate', approvalGateNode))
+    .addNode('apply', traceExecutorNode('apply', applyNode))
+    .addNode('verify_step', traceExecutorNode('verify_step', verifyStepNode))
+    .addNode('step_review', traceExecutorNode('step_review', stepReviewNode))
+    .addNode('escalate', traceExecutorNode('escalate', escalateNode))
+    .addNode('finalize', traceExecutorNode('finalize', finalizeNode))
 
     .addEdge(START, 'init')
     .addConditionalEdges('init', afterInit, {

@@ -51,9 +51,15 @@ export const initNode = async (state: ExecutorStateType) => {
   if (verifyCommands.typeCheck) {
     const baseline = await runCommand(verifyCommands.typeCheck, state.cwd);
     baselineErrors = parseTscErrors(baseline.output);
-    debug('[executor/init]', baselineErrors.length, 'baseline type-check errors');
   }
 
-  debug('[executor/init]', plan.steps.length, 'steps; verify:', verifyCommands);
+  debug(
+    '[executor/init]',
+    `goal: ${plan.goal.replace(/\s+/g, ' ').trim().slice(0, 200)}`,
+    `\n  ${plan.steps.length} step(s):`,
+    plan.steps.map((s) => `\n    [${s.kind}] ${s.id} (${s.files.join(', ') || 'no files'})`).join(''),
+    `\n  verify: typeCheck=${verifyCommands.typeCheck ?? 'none'}, testRunner=${verifyCommands.testRunner ?? 'none'}`,
+    `| ${baselineErrors.length} baseline tsc error(s)`
+  );
   return { stepStates, verifyCommands, baselineErrors, lastError: null };
 };

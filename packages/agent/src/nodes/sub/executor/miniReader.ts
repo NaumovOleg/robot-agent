@@ -5,6 +5,7 @@ import { debug, MiniReaderOutputSchema } from '@robocode-packages/shared';
 import { getModel } from '../../../utils';
 import { buildMiniReaderPrompt } from '../../../prompts/sub/executor/miniReader';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
+import { summarizeHints } from './summary';
 
 export const miniReaderNode = async (state: ExecutorStateType) => {
   const { plan, cwd, currentStepId } = state;
@@ -55,7 +56,12 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
       new SystemMessage(prompt),
       new HumanMessage(`Generate the edit hints for step "${step.id}".`),
     ]);
-    debug('[executor/mini_reader]', step.id, output.hints.length, 'hints');
+    debug(
+      '[executor/mini_reader]',
+      step.id,
+      `proposed ${output.hints.length} hint(s):`,
+      summarizeHints(output.hints)
+    );
     if (output.hints.length === 0) {
       return { currentHints: [], lastError: 'mini_reader produced zero hints' };
     }

@@ -16,6 +16,7 @@ import { planApprovalNode } from '../nodes/root/planApproval';
 import { executorReportNode } from '../nodes/root/executorReport';
 import { executorGraph } from '../subagents/executor';
 import { afterPlanner, afterPlanApproval } from './rootRouting';
+import { traceRootNode } from '../nodes/root/trace';
 
 export { afterPlanner, afterPlanApproval } from './rootRouting';
 
@@ -23,16 +24,16 @@ export function buildGraph() {
   const checkpointer = Checkpointer.getInstance();
 
   const graph = new StateGraph(RootState)
-    .addNode('context_node', contextNode)
-    .addNode('pre_route', preRoute)
-    .addNode('router_intent', routerIntentNode)
-    .addNode('file_selector', fileSelectorNode)
-    .addNode('planner', plannerNode)
-    .addNode('question_node', askUserNode)
-    .addNode('plan_approval', planApprovalNode)
-    .addNode('executor', executorGraph as never)
-    .addNode('executor_report', executorReportNode)
-    .addNode('agent', rootAgentNode)
+    .addNode('context_node', traceRootNode('context_node', contextNode))
+    .addNode('pre_route', traceRootNode('pre_route', preRoute))
+    .addNode('router_intent', traceRootNode('router_intent', routerIntentNode))
+    .addNode('file_selector', traceRootNode('file_selector', fileSelectorNode))
+    .addNode('planner', traceRootNode('planner', plannerNode))
+    .addNode('question_node', traceRootNode('question_node', askUserNode))
+    .addNode('plan_approval', traceRootNode('plan_approval', planApprovalNode))
+    .addNode('executor', executorGraph)
+    .addNode('executor_report', traceRootNode('executor_report', executorReportNode))
+    .addNode('agent', traceRootNode('agent', rootAgentNode))
     .addEdge(START, 'context_node')
     .addEdge('context_node', 'pre_route')
     .addEdge('pre_route', 'router_intent')

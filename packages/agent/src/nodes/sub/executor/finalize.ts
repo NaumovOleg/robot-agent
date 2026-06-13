@@ -20,7 +20,19 @@ export const finalizeNode = (state: ExecutorStateType) => {
       retries: state.retryCounts[s.id] ?? 0,
     }));
 
-  debug('[executor/finalize]', stepResults.length + missing.length, 'step results');
+  const all = [...stepResults, ...missing];
+  const tally = all.reduce<Record<string, number>>((acc, r) => {
+    acc[r.status] = (acc[r.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  debug(
+    '[executor/finalize]',
+    `${all.length} step result(s) —`,
+    Object.entries(tally)
+      .map(([s, n]) => `${n} ${s}`)
+      .join(', '),
+    all.map((r) => `\n    [${r.status}] ${r.stepId}`).join('')
+  );
   return missing.length > 0 ? { stepResults: missing } : {};
 };
 

@@ -44,15 +44,16 @@ export const applyNode = async (state: ExecutorStateType) => {
         stepId: currentStepId,
         file: result.file,
         op: hint.op,
-        diff: hint.op === 'rename_file' && hint.target
-          ? `${hint.file} → ${hint.target}`
-          : hintDiff(hint.op, hint.anchor, hint.newContent),
+        diff:
+          hint.op === 'rename_file' && hint.target
+            ? `${hint.file} → ${hint.target}`
+            : hintDiff(hint.op, hint.anchor, hint.newContent),
       });
     } catch (err) {
       const message = `hint ${i + 1}/${currentHints.length} (${hint.op} ${hint.file}): ${String(
         (err as Error).message ?? err
       )}`;
-      debug('[executor/apply] failed:', message);
+      debug('[executor/apply] failed:', message, err);
       return {
         fileSnapshots,
         appliedOps: { [currentStepId]: applied },
@@ -61,6 +62,11 @@ export const applyNode = async (state: ExecutorStateType) => {
     }
   }
 
-  debug('[executor/apply]', currentStepId, applied.length, 'ops applied');
+  debug(
+    '[executor/apply]',
+    currentStepId,
+    `applied ${applied.length} op(s):`,
+    applied.map((s) => `\n    ✓ ${s}`).join('')
+  );
   return { fileSnapshots, appliedOps: { [currentStepId]: applied }, lastError: null };
 };

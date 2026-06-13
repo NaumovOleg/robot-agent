@@ -2,6 +2,7 @@ import { EventBus } from '@robocode-packages/core';
 import { debug } from '@robocode-packages/shared';
 import type { PlannerOutput, StepStatus, StepResult } from '@robocode-packages/shared';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
+import { summarizeState } from './summary';
 
 type PlanStep = PlannerOutput['steps'][number];
 
@@ -27,7 +28,15 @@ export const stepSelectorNode = async (state: ExecutorStateType) => {
     EventBus.emit('executor:step:start', {
       sessionId, stepId: next.id, title: next.title, index, total,
     });
-    debug('[executor/select]', next.id, `(${index}/${total})`);
+    debug(
+      '[executor/select]',
+      `(${index}/${total}) [${next.kind}]`,
+      next.id,
+      '—',
+      next.title,
+      '\n  state:',
+      summarizeState({ ...state, currentStepId: next.id })
+    );
     return {
       currentStepId: next.id,
       stepStates: { [next.id]: 'running' as StepStatus },
