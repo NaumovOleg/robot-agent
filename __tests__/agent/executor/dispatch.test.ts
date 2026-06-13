@@ -70,6 +70,31 @@ describe('dispatchHint', () => {
     expect(await read('a.ts')).toContain('export const salute');
   });
 
+  it('rename_symbol renames the declaration AND every usage', async () => {
+    await fs.writeFile(
+      path.join(dir, 'comp.tsx'),
+      'const App = () => null;\nexport const Root = () => <App />;\n'
+    );
+    await dispatchHint(
+      hint({ op: 'rename_symbol', file: 'comp.tsx', nodeType: 'variable_declarator', symbol: 'App', newSymbol: 'Page' }),
+      dir
+    );
+    const out = await read('comp.tsx');
+    expect(out).toContain('const Page = () => null;');
+    expect(out).toContain('<Page />');
+    expect(out).not.toContain('App');
+  });
+
+  it('rename_symbol tolerates a wrong (TS-compiler-style) nodeType', async () => {
+    // LLMs often emit "VariableDeclaration" instead of the tree-sitter type;
+    // rename locates by symbol text, so it must still work.
+    await dispatchHint(
+      hint({ op: 'rename_symbol', file: 'a.ts', nodeType: 'VariableDeclaration', symbol: 'greet', newSymbol: 'salute' }),
+      dir
+    );
+    expect(await read('a.ts')).toContain('export const salute');
+  });
+
   it('create_file creates with content and parent dirs', async () => {
     await dispatchHint(
       hint({ op: 'create_file', file: 'src/new.ts', newContent: 'export const n = 1;\n' }),

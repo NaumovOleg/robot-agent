@@ -75,19 +75,49 @@ export const findNode = (
   return matches[0];
 };
 
+// Identifier node types that carry a renamable symbol occurrence (declaration,
+// reference, JSX tag, type reference). property_identifier is included so member
+// expressions and JSX attributes track the rename too.
+const RENAME_IDENTIFIER_TYPES = new Set([
+  'identifier',
+  'type_identifier',
+  'property_identifier',
+  'shorthand_property_identifier',
+  'shorthand_property_identifier_pattern',
+]);
+
+// Renames EVERY occurrence of `symbol` in the file — declaration plus all
+// references/usages (e.g. `const App` and every `<App />`). A single-node rename
+// would leave usages dangling and break the type check, so a symbol rename is
+// inherently file-wide. nodeType is intentionally ignored: LLMs frequently emit
+// TS-compiler node names (e.g. "VariableDeclaration") that don't match
+// tree-sitter grammar, and the symbol text is the reliable anchor.
 export const applyAstRename = (content: string, edit: AstEdit, tree: Tree): string => {
-  const { nodeType, symbol, newSymbol, parentNodeType, lines } = edit;
+  const { symbol, newSymbol } = edit;
   if (!symbol || !newSymbol) throw new Error('[ast/rename] symbol and newSymbol are required');
 
-  const node = findNode(tree.rootNode, nodeType, symbol, parentNodeType, lines);
-  if (!node) throw new Error(`[ast/rename] Node not found: ${nodeType} ${symbol}`);
+  const targets: { start: number; end: number }[] = [];
+  const visit = (node: Node): void => {
+    if (RENAME_IDENTIFIER_TYPES.has(node.type) && node.text === symbol) {
+      targets.push({ start: node.startIndex, end: node.endIndex });
+    }
+    for (const child of node.children) {
+      if (child) visit(child);
+    }
+  };
+  visit(tree.rootNode);
 
-  const nameNode = getNameNode(node);
-  if (!nameNode || nameNode.text !== symbol) {
-    throw new Error(`[ast/rename] Name node not found for: ${nodeType} ${symbol}`);
+  if (targets.length === 0) {
+    throw new Error(`[ast/rename] Symbol not found: ${symbol}`);
   }
 
-  return content.slice(0, nameNode.startIndex) + newSymbol + content.slice(nameNode.endIndex);
+  // Apply from the end so earlier offsets stay valid.
+  targets.sort((a, b) => b.start - a.start);
+  let next = content;
+  for (const { start, end } of targets) {
+    next = next.slice(0, start) + newSymbol + next.slice(end);
+  }
+  return next;
 };
 
 export const applyAstReplace = (content: string, edit: AstEdit, tree: Tree): string => {

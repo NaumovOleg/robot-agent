@@ -85,29 +85,33 @@ describe('reader schemas', () => {
     ).toThrow();
   });
 
-  it('requires AST evidence for sufficient output when analyzed files are code files', () => {
-    expect(() =>
-      ReaderOutputSchema.parse({
-        summary: 'Collected enough evidence for code edit.',
-        status: 'sufficient',
-        filesAnalyzed: ['src/router.ts'],
-        key_findings: [
-          {
-            file: 'src/router.ts',
-            lines: '1-3',
-            content: "export type Route = 'welcome';",
-            comment: 'Route declaration is present.',
-          },
-        ],
-        potential_edit_strategy: {
-          goal: 'Update route type',
-          files_to_modify: ['src/router.ts'],
-          change_type: 'modify',
-          instructions: "Add 'faq' to Route type.",
-          constraints: [],
+  it('accepts a thin sufficient output without AST evidence (summary-only is usable)', () => {
+    // The reader used to HARD-FAIL (OUTPUT_PARSING_FAILURE) on a sufficient output
+    // with files but no functions/classes/imports/references. That broke the
+    // executor inspect step on otherwise-valid thin output, so the requirement
+    // was removed — a summary still feeds the mini-reader and files are re-read.
+    const parsed = ReaderOutputSchema.parse({
+      summary: 'Collected enough evidence for code edit.',
+      status: 'sufficient',
+      filesAnalyzed: ['src/router.ts'],
+      key_findings: [
+        {
+          file: 'src/router.ts',
+          lines: '1-3',
+          content: "export type Route = 'welcome';",
+          comment: 'Route declaration is present.',
         },
-      })
-    ).toThrow(/analyzed code files/);
+      ],
+      potential_edit_strategy: {
+        goal: 'Update route type',
+        files_to_modify: ['src/router.ts'],
+        change_type: 'modify',
+        instructions: "Add 'faq' to Route type.",
+        constraints: [],
+      },
+    });
+    expect(parsed.status).toBe('sufficient');
+    expect(parsed.functions).toEqual([]);
   });
 
   it('enforces ast analyzer symbolName rules', () => {

@@ -524,22 +524,12 @@ export const ReaderOutputSchema = z
       ensureAnalyzed(finding.file, ['key_findings', i, 'file']);
     });
 
-    // ── AST evidence requirement for sufficient outputs ───────────────────────
-    if (
-      data.status === 'sufficient' &&
-      data.filesAnalyzed.length > 0 &&
-      data.functions.length === 0 &&
-      data.classes.length === 0 &&
-      data.imports.length === 0 &&
-      data.references.length === 0
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['functions'],
-        message:
-          'When status is "sufficient" and analyzed code files are present, at least one of functions, classes, imports, or references must be non-empty.',
-      });
-    }
+    // NOTE: previously this required at least one of functions/classes/imports/
+    // references to be non-empty for a "sufficient" output. That made the reader
+    // HARD-FAIL (OUTPUT_PARSING_FAILURE) whenever the LLM returned a thin but
+    // valid summary, which then failed the whole executor inspect step. A thin
+    // output is still usable — the summary feeds the mini-reader and target files
+    // are re-read fresh — so the requirement was removed.
 
     // ── strategy cross-refs ────────────────────────────────────────────────────
     const strategy = data.potential_edit_strategy;

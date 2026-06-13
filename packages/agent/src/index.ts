@@ -23,6 +23,18 @@ class RoboAgent {
     return `${sessionId ?? this.session?.id ?? ''}_main`;
   }
 
+  // Resolves the session for a resume/answer. Falls back to the in-memory active
+  // session when the on-disk index lookup misses — during a live run (e.g. an
+  // executor escalation interrupt) the session is held in memory and may not be
+  // reloadable from the index yet, which previously threw "Session not found".
+  private resolveSession(sessionId: string): Session | null {
+    const loaded = SessionService.load(sessionId);
+    if (loaded) return loaded;
+    if (this.session?.id === sessionId) return this.session;
+    if (SessionService.active?.id === sessionId) return SessionService.active;
+    return null;
+  }
+
   private async publishGitDiff(sessionId: string, cwd: string) {
     const [gitDiffStat, gitDiffPreview] = await Promise.all([
       getGitDiffStat(cwd),
@@ -184,7 +196,7 @@ class RoboAgent {
 
   async resume(params: { sessionId: string; decision: 'approve' | 'reject' | 'y' | 'n' }) {
     const { sessionId, decision } = params;
-    const session = SessionService.load(sessionId);
+    const session = this.resolveSession(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
     AuditService.append(sessionId, 'agent:resume', { decision });
@@ -207,7 +219,7 @@ class RoboAgent {
 
   async answerQuestion(params: { sessionId: string; answer: string }) {
     const { sessionId, answer } = params;
-    const session = SessionService.load(sessionId);
+    const session = this.resolveSession(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
     AuditService.append(sessionId, 'agent:answer', { answer });

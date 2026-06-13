@@ -41,7 +41,9 @@ const requireField = <T>(value: T | null | undefined, field: string, op: string)
 const astEditFromHint = (hint: ExecutorHint, action: AstEdit['action']): AstEdit => ({
   mode: 'ast',
   action,
-  nodeType: requireField(hint.nodeType, 'nodeType', hint.op),
+  // rename locates by symbol text (nodeType is ignored by applyAstRename); the
+  // other AST ops need a real tree-sitter nodeType to find their target.
+  nodeType: action === 'rename' ? hint.nodeType ?? '' : requireField(hint.nodeType, 'nodeType', hint.op),
   symbol: hint.symbol ?? null,
   newSymbol: hint.newSymbol ?? null,
   parentNodeType: null,
