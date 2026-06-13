@@ -99,18 +99,27 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
       new SystemMessage(prompt),
       new HumanMessage(`Generate the edit hints for step "${step.id}".`),
     ]);
+
+    const hints = output.hints ?? [];
     debug(
       '[executor/mini_reader]',
       step.id,
-      `proposed ${output.hints.length} hint(s):`,
-      summarizeHints(output.hints)
+      `status=${output.status} (${hints.length} hint(s)):`,
+      summarizeHints(hints)
     );
-    if (output.hints.length === 0) {
-      return { currentHints: [], lastError: 'mini_reader produced zero hints' };
+
+    if (output.status === 'noop') {
+      // Step's intent already satisfied on disk — done, no edit, no retry.
+      return { currentHints: [], miniReaderStatus: 'noop' as const, lastError: null, userGuidance: null };
     }
-    return { currentHints: output.hints, lastError: null, userGuidance: null };
+    if (output.status === 'blocked') {
+      // Cannot proceed — surface reason and route to escalate (no retry burn).
+      return { currentHints: [], miniReaderStatus: 'blocked' as const, lastError: output.reason };
+    }
+    // status === 'edits' — superRefine guarantees >= 1 hint.
+    return { currentHints: hints, miniReaderStatus: 'edits' as const, lastError: null, userGuidance: null, hintErrors: [] };
   } catch (err) {
     debug('[executor/mini_reader] LLM failed', err);
-    return { currentHints: [], lastError: `mini_reader LLM error: ${String(err).slice(0, 500)}` };
+    return { currentHints: [], miniReaderStatus: 'blocked' as const, lastError: `mini_reader LLM error: ${String(err).slice(0, 500)}` };
   }
 };
