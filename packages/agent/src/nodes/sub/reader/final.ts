@@ -1,4 +1,4 @@
-import type { ReaderStateType } from '../../../subagents/reader';
+import type { ReaderStateType } from '@robocode-packages/shared';
 import type { ReaderOutput } from '@robocode-packages/shared';
 import { debug, ReaderOutputSchema, isAIMessage } from '@robocode-packages/shared';
 import { SystemMessage } from '@langchain/core/messages';
@@ -24,7 +24,11 @@ function parseJsonRecord(value: unknown): MaybeRecord | null {
 }
 
 function sanitizeReaderOutputCandidate(candidate: MaybeRecord): MaybeRecord {
-  const files_analyzed = Array.isArray(candidate.files_analyzed) ? candidate.files_analyzed : [];
+  const files_analyzed = Array.isArray(candidate.files_analyzed)
+    ? candidate.files_analyzed
+    : Array.isArray(candidate.filesAnalyzed)
+      ? candidate.filesAnalyzed
+      : [];
   const analyzedSet = new Set(
     files_analyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
   );
@@ -75,33 +79,39 @@ function sanitizeReaderOutputCandidate(candidate: MaybeRecord): MaybeRecord {
     classes: sanitizeByLocation(candidate.classes),
     imports: sanitizeByLocation(candidate.imports),
     references: sanitizeReferences(candidate.references),
-    key_findings: sanitizeFindings(candidate.key_findings),
+    key_findings: sanitizeFindings(candidate.key_findings ?? candidate.keyFindings),
   };
 
-  const strategyRaw = sanitized.potential_edit_strategy;
+  const strategyRaw = sanitized.potential_edit_strategy ?? candidate.potentialEditStrategy;
   if (!strategyRaw || typeof strategyRaw !== 'object' || Array.isArray(strategyRaw)) {
     return sanitized;
   }
 
   const strategy = strategyRaw as MaybeRecord;
-  const filesToModify = Array.isArray(strategy.files_to_modify)
-    ? strategy.files_to_modify.filter(
-        (file): file is string => typeof file === 'string' && file.length > 0
-      )
-    : [];
+  const filesToModifyRaw = Array.isArray(strategy.files_to_modify)
+    ? strategy.files_to_modify
+    : Array.isArray(strategy.filesToModify)
+      ? strategy.filesToModify
+      : [];
+  const filesToModify = filesToModifyRaw.filter(
+    (file): file is string => typeof file === 'string' && file.length > 0
+  );
   const modifySet = new Set(filesToModify);
 
-  const operationHints = Array.isArray(strategy.operation_hints)
-    ? strategy.operation_hints.filter((hint) => {
-        if (!hint || typeof hint !== 'object' || Array.isArray(hint)) return false;
-        const hintRecord = hint as MaybeRecord;
-        const op = hintRecord.op;
-        const file = hintRecord.file;
-        if (typeof op !== 'string' || typeof file !== 'string') return false;
-        if (op === 'create_file') return true;
-        return analyzedSet.has(file) && modifySet.has(file);
-      })
-    : [];
+  const operationHintsRaw = Array.isArray(strategy.operation_hints)
+    ? strategy.operation_hints
+    : Array.isArray(strategy.operationHints)
+      ? strategy.operationHints
+      : [];
+  const operationHints = operationHintsRaw.filter((hint) => {
+    if (!hint || typeof hint !== 'object' || Array.isArray(hint)) return false;
+    const hintRecord = hint as MaybeRecord;
+    const op = hintRecord.op;
+    const file = hintRecord.file;
+    if (typeof op !== 'string' || typeof file !== 'string') return false;
+    if (op === 'create_file') return true;
+    return analyzedSet.has(file) && modifySet.has(file);
+  });
 
   return {
     ...sanitized,
@@ -140,10 +150,10 @@ function synthesizeMinimalOutput(error: unknown, state: ReaderStateType): Reader
     `Partial inspection of ${focus.join(', ') || state.task || 'the target files'}; ` +
       `the structured reader output could not be fully parsed.`;
 
-  const files_analyzed =
-    raw && Array.isArray(raw.files_analyzed)
-      ? raw.files_analyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
-      : focus;
+  const rawFiles = raw ? (raw.files_analyzed ?? raw.filesAnalyzed) : null;
+  const files_analyzed = Array.isArray(rawFiles)
+    ? rawFiles.filter((f): f is string => typeof f === 'string' && f.length > 0)
+    : focus;
 
   const candidate = {
     schemaVersion: 'reader.output.v2' as const,
@@ -177,10 +187,11 @@ export async function finalReadNode(state: ReaderStateType) {
   let editIntentInputPayload;
   try {
     editIntentInputPayload = await llm.invoke([new SystemMessage(prompt), ...messages]);
+    debug('+++++++++', editIntentInputPayload);
   } catch (err) {
     const recovered = tryRecoverReaderOutput(err);
     if (recovered) {
-      debug('[reader/final] recovered output from raw LLM JSON after parse failure');
+      debug('[reader/final] recovered output from raw LLM JSON after parse failure', err);
       editIntentInputPayload = recovered;
     } else {
       // Never throw: degrade to a minimal insufficient digest so one bad field
@@ -188,7 +199,8 @@ export async function finalReadNode(state: ReaderStateType) {
       editIntentInputPayload = synthesizeMinimalOutput(err, state);
       debug(
         '[reader/final] parse failed; degraded to insufficient digest:',
-        editIntentInputPayload.summary
+        editIntentInputPayload.summary,
+        editIntentInputPayload
       );
     }
   }

@@ -12,7 +12,7 @@ const MAX_FINDING_CHARS = 800;
 export const digestReaderOutput = (stepId: string, output: ReaderOutput): ReaderDigest => ({
   stepId,
   summary: output.summary,
-  keyFindings: (output.key_findings ?? []).slice(0, MAX_FINDINGS).map((f) => ({
+  keyFindings: (output.key_findings ?? []).slice(0, MAX_FINDINGS).map((f: any) => ({
     file: f.file,
     lines: f.lines,
     content: f.content.slice(0, MAX_FINDING_CHARS),

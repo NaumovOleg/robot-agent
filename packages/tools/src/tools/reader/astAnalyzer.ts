@@ -1,24 +1,58 @@
-import type { AstAnalyzerInput } from '@robocode-packages/shared';
-import { createAstParser, AnalyzeAstToolSchema, TOOL_NAMES } from '@robocode-packages/shared';
 import path from 'node:path';
 import fs from 'node:fs';
 import { tool } from '@langchain/core/tools';
-import { findFunctions, findClasses, findImports, findReferences } from '../../utils';
+import type { RunnableConfig } from '@langchain/core/runnables';
+import type { z } from 'zod';
+import { createAstParser } from '../../../../shared/src/ast/parser';
+import { AnalyzeAstToolSchema } from '../../../../shared/src/schemas/reader/tools/ast';
+import { TOOL_NAMES } from '../../../../shared/src/types/agent';
+import { findFunctions, findClasses, findImports, findReferences } from '../../utils/ast';
+import { debug } from '@robocode-packages/shared';
 
-export const astAnalyzer = async ({
-  filePath,
-  queryType,
-  symbolName,
-  includeBody,
-}: AstAnalyzerInput) => {
+export const astAnalyzer = async (
+  { filePath, queryType, symbolName, includeBody }: z.infer<typeof AnalyzeAstToolSchema>,
+  config?: RunnableConfig
+) => {
   try {
-    const ext = path.extname(filePath).toLowerCase();
-    const { parser, language } = await createAstParser(filePath);
-    if (!language) return `Error: No parser for ${ext}`;
+    const cwd = (config?.configurable?.cwd as string) ?? process.cwd();
+    const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(cwd, filePath);
+    if (!fs.existsSync(targetPath)) {
+      return JSON.stringify({ ok: false, file: targetPath, queryType, error: 'File not found' });
+    }
+    const stat = fs.statSync(targetPath);
+    if (stat.isDirectory()) {
+      return JSON.stringify({
+        ok: false,
+        file: targetPath,
+        queryType,
+        error: 'Path is a directory',
+      });
+    }
 
-    const source = fs.readFileSync(filePath, 'utf-8');
+    const ext = path.extname(targetPath).toLowerCase();
+    debug('EXTENSION', { ext, targetPath });
+    const { parser, language } = await createAstParser(targetPath);
+    if (!language) {
+      return JSON.stringify({
+        ok: false,
+        file: targetPath,
+        queryType,
+        error: `No parser for ${ext}`,
+      });
+    }
+
+    const source = fs.readFileSync(targetPath, 'utf-8');
     const tree = parser.parse(source);
-    if (!tree) return 'Ast tree not found';
+    debug('AST tree ', tree);
+    if (!tree) {
+      return JSON.stringify({
+        ok: false,
+        file: targetPath,
+        queryType,
+        error: 'AST tree not found',
+      });
+    }
+
     let result;
     switch (queryType) {
       case 'functions':
@@ -31,13 +65,19 @@ export const astAnalyzer = async ({
         result = findImports(tree.rootNode, source, language);
         break;
       case 'references':
-        result = findReferences(tree.rootNode, source, filePath, symbolName);
+        result = findReferences(tree.rootNode, source, targetPath, symbolName);
         break;
     }
-    return JSON.stringify({ file: filePath, [queryType]: result });
+    debug('AST RESULT ', result);
+    return JSON.stringify({ ok: true, file: targetPath, queryType, [queryType]: result });
   } catch (err: any) {
-    console.log(err);
-    return err.message;
+    debug('AST ERROR ', err);
+    return JSON.stringify({
+      ok: false,
+      file: filePath,
+      queryType,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 };
 

@@ -9,10 +9,13 @@ describe('reader schemas — contract robustness', () => {
     // Exact payload from apps/cli/.robocode/debug.log that previously hard-failed
     // the inspect step on a missing required `signature`.
     const parsed = ReaderOutputSchema.parse({
+      status: 'insufficient',
       summary: 'Extract function info for App in src/app.tsx.',
       language: 'typescript',
       files_analyzed: ['src/app.tsx'],
       functions: [{ name: 'App', location: 'src/app.tsx:63' }],
+      unresolved_questions: ['Need additional anchors for precise edit planning.'],
+      potential_edit_strategy: null,
     });
     expect(parsed.functions[0]).toMatchObject({ name: 'App', signature: null });
     expect(parsed.functions[0].params).toEqual([]);
@@ -20,6 +23,7 @@ describe('reader schemas — contract robustness', () => {
 
   it('coerces structured params/calls objects into string arrays', () => {
     const parsed = ReaderOutputSchema.parse({
+      status: 'insufficient',
       summary: 's',
       files_analyzed: ['src/a.ts'],
       functions: [
@@ -30,6 +34,8 @@ describe('reader schemas — contract robustness', () => {
           calls: [{ callee: 'useState' }, 'plain'],
         },
       ],
+      unresolved_questions: ['Need more context to produce edit strategy.'],
+      potential_edit_strategy: null,
     });
     expect(parsed.functions[0].params).toEqual(['a', 'b']);
     expect(parsed.functions[0].calls).toEqual(['useState', 'plain']);
@@ -37,9 +43,12 @@ describe('reader schemas — contract robustness', () => {
 
   it('tolerates extra (passthrough) fields on a function', () => {
     const parsed = ReaderOutputSchema.parse({
+      status: 'insufficient',
       summary: 's',
       files_analyzed: ['src/a.ts'],
       functions: [{ name: 'f', location: 'src/a.ts:1', async: true, exported: true }],
+      unresolved_questions: ['Need concrete target edits.'],
+      potential_edit_strategy: null,
     });
     expect(parsed.functions[0].name).toBe('f');
   });
@@ -152,6 +161,7 @@ describe('reader schemas — contract robustness', () => {
     });
     expect(parsed.status).toBe('sufficient');
     expect(parsed.functions).toEqual([]);
+    expect(parsed.schemaVersion).toBe('reader.output.v2');
   });
 
   it('coerces structured params/calls and accepts missing function signature/location', () => {
@@ -177,13 +187,51 @@ describe('reader schemas — contract robustness', () => {
           comment: 'Main entry component declaration.',
         },
       ],
-      potential_edit_strategy: null,
+      potential_edit_strategy: {
+        goal: 'Update App entrypoint declaration safely',
+        files_to_modify: ['src/app.tsx'],
+        change_type: 'modify',
+        instructions: 'Adjust App declaration according to task requirements.',
+        constraints: ['Preserve current component contract'],
+      },
     });
 
     expect(parsed.functions[0]?.params).toEqual(['props', 'ctx']);
     expect(parsed.functions[0]?.calls).toEqual(['React.useMemo', 'render']);
     expect(parsed.functions[0]?.signature).toBeNull();
     expect(parsed.functions[0]?.location).toBeNull();
+  });
+
+  it('requires unresolved_questions when status is insufficient', () => {
+    expect(() =>
+      ReaderOutputSchema.parse({
+        summary: 'Need more data',
+        status: 'insufficient',
+        files_analyzed: ['src/app.tsx'],
+        unresolved_questions: [],
+        key_findings: [],
+        potential_edit_strategy: null,
+      })
+    ).toThrow();
+  });
+
+  it('requires potential_edit_strategy when status is sufficient', () => {
+    expect(() =>
+      ReaderOutputSchema.parse({
+        summary: 'Concrete evidence exists',
+        status: 'sufficient',
+        files_analyzed: ['src/app.tsx'],
+        key_findings: [
+          {
+            file: 'src/app.tsx',
+            lines: '1',
+            content: 'export const App = () => null;',
+            comment: 'Anchor',
+          },
+        ],
+        potential_edit_strategy: null,
+      })
+    ).toThrow();
   });
 
   it('enforces ast analyzer symbolName rules', () => {

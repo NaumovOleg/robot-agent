@@ -20,16 +20,16 @@ describe('READER_FINALIZER_PROMPT', () => {
     expect(prompt).toContain('src/app.tsx');
   });
 
-  it('treats AST evidence as optional and drops the strict status gates', () => {
+  it('defines strict status gates and keeps AST as best-effort evidence', () => {
     const prompt = READER_FINALIZER_PROMPT({
       task: 't',
       cwd: '/repo',
       user_goal: 'g',
       current_plan_step: 's',
     });
-    expect(prompt).not.toMatch(/at least one of[\s\S]*MUST be non-empty/);
-    expect(prompt).not.toMatch(/MUST set[\s\S]*status[\s\S]*insufficient/);
-    expect(prompt).toMatch(/OPTIONAL/);
-    expect(prompt).toMatch(/summary[\s\S]*key_findings/);
+    expect(prompt).toMatch(/status contract/i);
+    expect(prompt).toMatch(/potential_edit_strategy` MUST be non-null/i);
+    expect(prompt).toMatch(/unresolved_questions` MUST be non-empty/i);
+    expect(prompt).toMatch(/AST fields are optional/i);
   });
 });

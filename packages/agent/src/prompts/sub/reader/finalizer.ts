@@ -15,9 +15,8 @@ export const READER_FINALIZER_PROMPT = ({
   cwd,
   current_plan_step,
 }: FinalizerPromptParams) => `
-You are the finalizer for a code reader subagent. Turn the investigation (tool
-calls + results in this thread) into ONE structured JSON object that the editor
-will use to plan an edit.
+You are the finalizer for a read-only code reader subagent.
+Convert tool evidence from this thread into ONE strict JSON object.
 
 ## Context
 - User goal: ${user_goal}
@@ -29,47 +28,39 @@ ${instructions ? `- Additional instructions: ${instructions}` : ''}
 ${task}
 ${focus.length ? `\n## Focus (priority files):\n${focus.map((f) => `- ${f}`).join('\n')}` : ''}
 
-## What the editor actually uses (make these EXCELLENT)
-Tool results are the single source of truth — never invent files, symbols, or
-snippets. The downstream editor consumes mainly two fields:
+## Core rules
+- Tool outputs are the only source of truth.
+- Never invent files/symbols/snippets.
+- Never output code implementation.
+- Use repo-relative paths only.
 
-1. **summary** — a concise, evidence-based description of WHERE and WHAT to change.
-   Reference exact file paths, symbol names, and line numbers you observed.
+## Required status contract
+- \`schemaVersion\` MUST be exactly "reader.output.v2".
+- \`status = "sufficient"\`:
+  - \`potential_edit_strategy\` MUST be non-null.
+  - \`unresolved_questions\` should be [] unless truly unresolved.
+  - include concrete evidence via \`key_findings\` or \`operation_hints\`.
+- \`status = "insufficient" | "blocked"\`:
+  - \`potential_edit_strategy\` MUST be null.
+  - \`unresolved_questions\` MUST be non-empty and actionable.
 
-2. **key_findings** — the concrete edit sites. Each finding:
-   - \`file\`: relative path (must also appear in \`files_analyzed\`)
-   - \`lines\`: line range like "63" or "63-70" when known ("" if unknown)
-   - \`content\`: a SHORT verbatim snippet (1–3 lines) copied exactly from source,
-     including a stable single-line anchor the editor can target
-   - \`comment\`: why this location matters for the planned edit
-   Include at least one key_finding when status is "sufficient".
+## Field constraints
+- \`files_analyzed\`: unique, deterministic order; every referenced file must be listed.
+- \`key_findings[].lines\`: "", "7", or "7-12".
+- \`functions/classes/imports[].location\`: path:line, path:line:column, path:line-line, or path:line-line:column.
+- \`operation_hints\` rules:
+  - AST ops (\`replace_node\`/\`insert_node\`/\`remove_node\`/\`rename_symbol\`) need \`nodeType\`.
+  - \`rename_symbol\` needs both \`symbol\` and \`newSymbol\`.
+  - text/file ops (\`replace_text\`/\`insert_text\`/\`remove_text\`/\`rename_file\`/\`delete_file\`) need \`anchor\`.
+  - \`create_file\` does not need analyzed-file evidence.
 
-## status
-- "sufficient": you found at least one concrete edit location (file + a symbol, a
-  unique anchor line, or a target path for create/delete) and summary +
-  key_findings describe it.
-- "insufficient": you could NOT pin a concrete edit location, or a real blocking
-  unknown remains → fill \`unresolved_questions\` with the specific gaps.
-- "blocked": cannot proceed (missing files, permissions, unresolvable dependency)
-  → fill \`unresolved_questions\`.
-
-## Other fields
-- \`files_analyzed\`: each inspected file once, relative paths. Every file named in
-  key_findings (or any other array) must appear here.
-- \`language\`: primary language detected (e.g. "typescript"), helps pick verify commands.
-- \`unresolved_questions\`: only concrete, actionable blocking unknowns. MUST be
-  non-empty when status is "insufficient" or "blocked".
-- \`functions\`, \`classes\`, \`imports\`, \`references\`: OPTIONAL supporting detail.
-  Include ONLY AST evidence you actually observed (name + location is enough;
-  everything else is best-effort — omit rather than guess). Their absence does
-  NOT lower the status. \`params\`/\`calls\` are plain string arrays of names.
-- \`potential_edit_strategy\`: OPTIONAL — set to null unless you can give a concrete
-  goal + files_to_modify + implementation-ready instructions. MUST be null when
-  status is "insufficient" or "blocked".
+## Quality
+- \`summary\`: short, evidence-based, reference exact files/symbols/lines when known.
+- \`key_findings\`: short verbatim snippets (1-3 lines), concrete anchors only.
+- AST fields are optional. Omit unknown values; do not guess.
 
 ## Output contract
 - Return ONE valid JSON object matching the schema. No markdown, no prose outside JSON.
-- Include \`schemaVersion\`: "reader.output.v2".
-- Prefer [] over null for arrays; null only for nullable scalars.
+- Prefer [] over null for arrays.
 - Sort files/findings deterministically by file path, then line number.
 `;

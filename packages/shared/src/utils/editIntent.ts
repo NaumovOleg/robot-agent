@@ -209,21 +209,25 @@ const pickBestEvidence = (
 };
 
 const getTargetFiles = (output: ReaderOutput): string[] => {
-  const strategyFiles = output.potential_edit_strategy?.files_to_modify ?? [];
+  const strategyFiles = (output.potential_edit_strategy?.files_to_modify ?? []) as string[];
   if (strategyFiles.length > 0) {
     return unique(strategyFiles.map(cleanText).filter(Boolean)).sort();
   }
 
   const fromFindings = output.key_findings
-    .map((finding) => cleanText(finding.file))
+    .map((finding: any) => cleanText(finding.file))
     .filter(Boolean);
   const fromFunctions = output.functions
-    .map((fn) => parseLocation(fn.location).file)
+    .map((fn: any) => parseLocation(fn.location).file)
     .filter(Boolean);
-  const fromClasses = output.classes.map((cls) => parseLocation(cls.location).file).filter(Boolean);
-  const fromImports = output.imports.map((imp) => parseLocation(imp.location).file).filter(Boolean);
-  const fromReferences = output.references.flatMap((reference) =>
-    reference.usages.map((usage) => cleanText(usage.file)).filter(Boolean)
+  const fromClasses = output.classes
+    .map((cls: any) => parseLocation(cls.location).file)
+    .filter(Boolean);
+  const fromImports = output.imports
+    .map((imp: any) => parseLocation(imp.location).file)
+    .filter(Boolean);
+  const fromReferences = output.references.flatMap((reference: any) =>
+    reference.usages.map((usage: any) => cleanText(usage.file)).filter(Boolean)
   );
 
   return unique([

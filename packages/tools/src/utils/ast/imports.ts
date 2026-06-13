@@ -1,5 +1,5 @@
 import type { Node } from 'web-tree-sitter';
-import { AST_LANGUAGE_DECLARATIONS } from '@robocode-packages/shared';
+import { AST_LANGUAGE_DECLARATIONS } from '../../../../shared/src/ast/languages';
 
 interface ImportRecord {
   source: string;
