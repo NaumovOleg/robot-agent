@@ -11,6 +11,8 @@ export interface MiniReaderPromptInput {
   findings: ReaderDigest[];
   // Repo-relative paths created/changed by earlier steps in this plan.
   producedFiles?: string[];
+  // Existing sibling files to mirror conventions from when creating new files.
+  references?: { file: string; content: string }[];
   lastError: string | null;
   userGuidance: string | null;
   appliedOps: string[];
@@ -25,8 +27,12 @@ export const withLineNumbers = (content: string): string =>
     .join('\n');
 
 export const buildMiniReaderPrompt = (input: MiniReaderPromptInput): string => {
-  const { step, goal, constraints, files, findings, producedFiles, lastError, userGuidance, appliedOps } =
+  const { step, goal, constraints, files, findings, producedFiles, references, lastError, userGuidance, appliedOps } =
     input;
+
+  const referenceBlocks = (references ?? [])
+    .map(({ file, content }) => `### ${file}\n\`\`\`\n${content}\n\`\`\``)
+    .join('\n\n');
 
   const fileBlocks = files
     .map(({ file, content }) => {
@@ -87,6 +93,16 @@ ${producedFiles.map((f) => `- ${f}`).join('\n')}
 `
     : ''
 }
+${
+  referenceBlocks
+    ? `
+## Reference files (existing files of the same kind — MIRROR their conventions)
+When creating a new file, follow the import/export/style conventions shown here.
+Do not introduce patterns these files don't use.
+${referenceBlocks}
+`
+    : ''
+}
 ## Current file contents (fresh from disk, line-numbered)
 ${fileBlocks || '(no existing files — this step creates new ones)'}
 ${retryBlock}
@@ -98,7 +114,12 @@ ${retryBlock}
   "} from './x';".
 - "anchor" must be a VERBATIM substring copied from the file content above (without the "N | " line-number prefix) and must occur exactly once in the file.
 - "newContent" is the complete replacement/insertion text — real code, correct indentation, no placeholders.
-- For create_file, "newContent" is the entire file content.
+- For create_file, "newContent" is the entire file content. Mirror the import,
+  export, and style conventions of the existing/reference files shown above —
+  do not assume conventions the project doesn't use.
+- Only import or declare what you actually use; unused imports/variables are dead
+  code and fail strict type checks. If a verification error reports an unused
+  declaration, remove it instead of re-emitting it.
 - For insert_text, set "insertMode" (before|after|start|end); the default is "after".
 - For rename_file, set "target" to the new repo-relative path.
 - To rename a symbol (a variable/function/component and ALL its usages in a file),

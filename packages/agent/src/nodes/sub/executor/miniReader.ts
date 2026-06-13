@@ -6,6 +6,7 @@ import { getModel } from '../../../utils';
 import { buildMiniReaderPrompt } from '../../../prompts/sub/executor/miniReader';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
 import { summarizeHints } from './summary';
+import { findReferenceFile } from './referenceFile';
 
 export const miniReaderNode = async (state: ExecutorStateType) => {
   const { plan, cwd, currentStepId } = state;
@@ -42,6 +43,20 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   const ownFiles = new Set(step.files);
   const producedFiles = (state.producedFiles ?? []).filter((f) => !ownFiles.has(f));
 
+  // For files this step will CREATE (in step.files but not on disk), pull an
+  // existing sibling of the same kind so the editor mirrors real project
+  // conventions instead of inventing them.
+  const loaded = new Set(files.map((f) => f.file));
+  const toCreate = step.files.filter((f) => !loaded.has(f));
+  const references = (
+    await Promise.all(toCreate.map((f) => findReferenceFile(cwd, f)))
+  ).filter((r): r is { file: string; content: string } => r !== null);
+  // Dedupe references by path.
+  const seenRef = new Set<string>();
+  const uniqueReferences = references.filter((r) =>
+    seenRef.has(r.file) ? false : (seenRef.add(r.file), true)
+  );
+
   const prompt = buildMiniReaderPrompt({
     step,
     goal: plan.goal,
@@ -49,6 +64,7 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     files,
     findings,
     producedFiles,
+    references: uniqueReferences,
     lastError: state.lastError,
     userGuidance: state.userGuidance,
     appliedOps: state.appliedOps[step.id] ?? [],

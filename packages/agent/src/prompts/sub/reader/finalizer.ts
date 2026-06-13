@@ -15,197 +15,61 @@ export const READER_FINALIZER_PROMPT = ({
   cwd,
   current_plan_step,
 }: FinalizerPromptParams) => `
-You are the finalizer for a code reader subagent.
-Analyze the conversation history (tool calls + tool results) and return one structured JSON object for downstream writer planning.
+You are the finalizer for a code reader subagent. Turn the investigation (tool
+calls + results in this thread) into ONE structured JSON object that the editor
+will use to plan an edit.
 
 ## Context
-
 - User goal: ${user_goal}
 - Current plan step: ${current_plan_step}
 - Working directory: ${cwd}
 ${instructions ? `- Additional instructions: ${instructions}` : ''}
 
-## Original reader task
-
+## Reader task
 ${task}
+${focus.length ? `\n## Focus (priority files):\n${focus.map((f) => `- ${f}`).join('\n')}` : ''}
 
-${focus.length ? `## Focus (priority files/patterns):\n${focus.map((f) => `- ${f}`).join('\n')}` : ''}
+## What the editor actually uses (make these EXCELLENT)
+Tool results are the single source of truth — never invent files, symbols, or
+snippets. The downstream editor consumes mainly two fields:
 
-## Input expectations
+1. **summary** — a concise, evidence-based description of WHERE and WHAT to change.
+   Reference exact file paths, symbol names, and line numbers you observed.
 
-The thread contains:
-- this instruction prompt
-- tool calls and tool results (\`list_dir\`, \`glob\`, \`grep\`, \`read_file\`, \`ast_analyzer\`, etc.)
+2. **key_findings** — the concrete edit sites. Each finding:
+   - \`file\`: relative path (must also appear in \`filesAnalyzed\`)
+   - \`lines\`: line range like "63" or "63-70" when known ("" if unknown)
+   - \`content\`: a SHORT verbatim snippet (1–3 lines) copied exactly from source,
+     including a stable single-line anchor the editor can target
+   - \`comment\`: why this location matters for the planned edit
+   Include at least one key_finding when status is "sufficient".
 
-Use tool results as the single source of truth. Never fabricate symbols, paths, or snippets not present in tool results.
+## status
+- "sufficient": you found at least one concrete edit location (file + a symbol, a
+  unique anchor line, or a target path for create/delete) and summary +
+  key_findings describe it.
+- "insufficient": you could NOT pin a concrete edit location, or a real blocking
+  unknown remains → fill \`unresolvedQuestions\` with the specific gaps.
+- "blocked": cannot proceed (missing files, permissions, unresolvable dependency)
+  → fill \`unresolvedQuestions\`.
 
-## Status rules
-
-The downstream editor consumes mainly your \`summary\` and \`key_findings\`. Make
-THOSE excellent. \`functions\`, \`classes\`, \`imports\`, \`references\` are OPTIONAL
-supporting evidence — include what you observed, but their absence NEVER lowers
-the status.
-
-- **\`sufficient\`**: you identified at least one concrete edit location (a file
-  plus a symbol, a unique single-line anchor, or a target path for create/delete)
-  AND your \`summary\` + at least one \`key_finding\` describe it. Empty
-  \`functions/classes/imports/references\` is fine.
-
-- **\`insufficient\`**: you could NOT identify any concrete edit location, or a
-  real blocking unknown remains. Populate \`unresolvedQuestions\` with the specific
-  gaps.
-
-- **\`blocked\`**: investigation cannot proceed due to missing files, permissions,
-  or unresolvable external dependencies. Populate \`unresolvedQuestions\`.
+## Other fields
+- \`filesAnalyzed\`: each inspected file once, relative paths. Every file named in
+  key_findings (or any other array) must appear here.
+- \`language\`: primary language detected (e.g. "typescript"), helps pick verify commands.
+- \`unresolvedQuestions\`: only concrete, actionable blocking unknowns. MUST be
+  non-empty when status is "insufficient" or "blocked".
+- \`functions\`, \`classes\`, \`imports\`, \`references\`: OPTIONAL supporting detail.
+  Include ONLY AST evidence you actually observed (name + location is enough;
+  everything else is best-effort — omit rather than guess). Their absence does
+  NOT lower the status. \`params\`/\`calls\` are plain string arrays of names.
+- \`potential_edit_strategy\`: OPTIONAL — set to null unless you can give a concrete
+  goal + files_to_modify + implementation-ready instructions. MUST be null when
+  status is "insufficient" or "blocked".
 
 ## Output contract
-
-- Return one valid JSON object that matches the structured schema.
-- No markdown, no commentary, no tool logs, no prose outside JSON.
-- Include \`schemaVersion\` as \`reader.output.v2\`.
-- Prefer [] over null for arrays. Use null only for nullable scalar fields.
-- \`potential_edit_strategy\` MUST be null when status is \`insufficient\` or \`blocked\`.
-- \`potential_edit_strategy\` should be non-null when status is \`sufficient\`; if you cannot structure it, null is accepted and the planner will use your \`key_findings\` and \`functions\` evidence instead.
-- \`unresolvedQuestions\` MUST be non-empty when status is \`insufficient\` or \`blocked\`.
-
-## Evidence discipline
-
-- Include only symbols/files/behaviors directly observed in tool results.
-- Never invent imports, component names, routes, APIs, or file contents.
-- Do not claim broad impact unless references/usages were explicitly inspected.
-- Prefer short verbatim snippets (usually 1-3 lines) over paraphrased descriptions.
-- If a concrete edit site or target symbol is missing, set \`potential_edit_strategy\` to \`null\`.
-- Sort files and findings deterministically by file path, then line number, then symbol name.
-
-## Field quality rules
-
-- \`filesAnalyzed\`:
-  - Include each inspected file once.
-  - Relative paths only.
-  - Every file referenced in \`functions\`, \`classes\`, \`imports\`, \`references\`, \`key_findings\`, or \`operation_hints\` MUST appear in \`filesAnalyzed\`.
-
-- \`language\`: Set to the primary language detected (e.g., \`"typescript"\`, \`"python"\`, \`"go"\`). This helps downstream tools generate correct verification commands.
-
-- \`functions\` (OPTIONAL — include only if you actually inspected functions):
-  - Include only functions/components observed via \`ast_analyzer\` or \`read_file\`.
-  - Required per item: \`name\` and \`location\`. Everything else is best-effort —
-    omit \`signature\`, \`params\`, \`calls\`, \`bodyPreview\` if you don't have them
-    rather than guessing. \`params\`/\`calls\` are plain string arrays of names.
-  - Preserve \`nodeType\` and \`parentNodeType\` from AST output when available.
-  - \`bodyPreview\`: at most the first 1–5 lines of the body, verbatim.
-
-- \`classes\`:
-  - Populate \`methods\` and \`properties\` with observed identifiers only.
-  - \`location\` must include the exact file path and line number.
-
-- \`imports\`:
-  - Record each relevant import statement once.
-  - \`specifiers\` must list the exact identifiers as they appear in source.
-
-- \`references\`:
-  - Include only symbols explicitly searched with \`grep\` or \`find_definition\`.
-  - Each usage must have a real observed file:line.
-
-- \`key_findings\`:
-  - Include file + short anchor snippet + why it matters for the planned edit.
-  - Use exact source fragments where possible.
-  - At least one key_finding should be present when status is \`sufficient\`.
-
-- \`unresolvedQuestions\`:
-  - Include only concrete, specific blocking unknowns (not vague concerns).
-  - Each question must be actionable — something a user could answer to unblock the edit plan.
-  - Example: "Is the AuthService injected via constructor or module-level? Line 42 of auth.service.ts is ambiguous."
-
-## AST evidence (optional, best-effort)
-
-If you already ran \`ast_analyzer\`, copy its observed \`functions\`/\`classes\`/
-\`imports\`/\`references\` into the output. These fields are supporting detail only:
-- Never invent them — include only what tool results actually showed.
-- Their absence does NOT make the output \`insufficient\`. A precise \`summary\` and
-  one good \`key_finding\` (file + anchor + why) are what the editor actually uses.
-- Do NOT mark a file \`insufficient\` merely because AST fields are empty.
-
-## Concrete location definition
-
-A "concrete edit location" means:
-- **For AST operations**: file + symbol name + nodeType + line range (all four must be known).
-- **For text operations**: file + a single stable anchor line that is unique in the file.
-- **For file operations** (create/delete/rename): just the target file path.
-
-Do NOT declare status \`sufficient\` if you only know the file but not the specific symbol, anchor, or line range.
-
-## Strategy rules (\`potential_edit_strategy\`)
-
-Use change type by intent:
-- \`add\`: introduces new behavior/branch/component/export/file.
-- \`modify\`: changes existing behavior in-place.
-- \`delete\`: removes code/behavior.
-- \`rename\`: primary change is renaming an existing symbol.
-- \`refactor\`: structural cleanup with behavior intent preserved.
-- \`create\`: explicitly creating a new file/module.
-
-When strategy is non-null:
-- \`goal\` must be one concrete objective.
-- \`files_to_modify\` must be a subset of \`filesAnalyzed\`. New files to be created may be listed here even if not yet in \`filesAnalyzed\`.
-- \`instructions\` must be implementation-ready: exact edit site, exact operation, expected resulting code shape.
-- \`constraints\` should capture non-negotiable requirements only.
-- \`operation_hints\` should contain one item per atomic expected edit:
-  - Use enum \`op\`, not prose.
-  - Include \`file\` and observed \`lines\` whenever known.
-  - Include \`nodeType\` for AST-level operations (replace_node, insert_node, remove_node, rename_symbol).
-  - Include \`symbol\` for symbol-targeted ops (replace_node, remove_node, rename_symbol).
-  - For \`replace_text\` and \`remove_text\`: \`anchor\` is required — provide a single stable line copied verbatim from the file (max ~250 chars, no newlines, unique in file).
-  - For \`insert_text\`: \`anchor\` is required when inserting before/after a specific line; set \`anchor\` to null only when appending to the very end of the file (no anchor possible).
-  - Keep \`details\` to one concise implementation instruction.
-  - IMPORTANT: Every hint file (except \`create_file\` ops) MUST appear in \`filesAnalyzed\`.
-
-Operation hint op values:
-- \`create_file\`, \`delete_file\`, \`rename_file\`
-- \`replace_node\`, \`insert_node\`, \`remove_node\`, \`rename_symbol\`
-- \`replace_text\`, \`insert_text\`, \`remove_text\`
-
-## Critical: choosing the correct op
-
-replace_text / replace_node — use when EXISTING code changes:
-- Modifying a type union: \`export type Route = 'a' | 'b'\` → \`'a' | 'b' | 'c'\` → replace_text (the declaration line IS changed)
-- Adding a member to an enum → replace_node (the enum body changes)
-- Updating a const/variable value → replace_text
-- Changing a function signature or body → replace_node
-
-insert_text — use ONLY when adding brand-new code that has NO existing counterpart:
-- Adding a new import that does not yet exist in the file
-- Adding a new element to an array literal where the array itself stays (anchor = last existing element)
-- Adding a new line between two existing lines
-- Appending new code at end of file
-
-WRONG — insert_text to add 'faq' to Route type:
-\`\`\`
-op: insert_text, anchor: "export type Route = 'a' | 'b';"
-→ result: two declarations side-by-side — BROKEN
-\`\`\`
-
-CORRECT — replace_text to update Route type:
-\`\`\`
-op: replace_text, anchor: "export type Route = 'a' | 'b';"
-→ writer replaces the one declaration with the new version
-\`\`\`
-
-BETTER — replace_node for TypeScript declarations:
-\`\`\`
-op: replace_node, nodeType: type_alias_declaration, symbol: Route
-→ tree-sitter finds and replaces the node precisely
-\`\`\`
-
-Enum members: adding a new member to an existing enum → replace_node (the full enum body changes), NOT insert_text.
-
-Rule: If the final output REPLACES or MODIFIES an existing line/block, use replace_text or replace_node. If the final output ADDS an entirely new line that doesn't touch any existing line, use insert_text.
-
-Rename-specific precision:
-- target the exact observed symbol name.
-- Include evidence-backed declaration location.
-- Do not use neighboring symbols or substring matches.
-- Include separate operation hints for known usage updates ONLY if references were inspected.
-
-Fallback behavior:
-- If no safe, concrete plan can be justified from inspected evidence, set \`potential_edit_strategy\` to \`null\` and explain in \`summary\` and \`unresolvedQuestions\`.
+- Return ONE valid JSON object matching the schema. No markdown, no prose outside JSON.
+- Include \`schemaVersion\`: "reader.output.v2".
+- Prefer [] over null for arrays; null only for nullable scalars.
+- Sort files/findings deterministically by file path, then line number.
 `;

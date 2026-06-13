@@ -44,6 +44,17 @@ describe('buildMiniReaderPrompt', () => {
     expect(prompt).not.toContain('Files created or changed by EARLIER steps');
   });
 
+  it('includes reference files to mirror conventions', () => {
+    const prompt = buildMiniReaderPrompt({
+      step, goal: 'g', constraints: [], files: [], findings: [],
+      references: [{ file: 'src/screens/Profile.tsx', content: 'export const Profile = () => null;' }],
+      lastError: null, userGuidance: null, appliedOps: [],
+    });
+    expect(prompt).toContain('MIRROR their conventions');
+    expect(prompt).toContain('src/screens/Profile.tsx');
+    expect(prompt).toContain('export const Profile');
+  });
+
   it('includes retry context when lastError is present', () => {
     const prompt = buildMiniReaderPrompt({
       step, goal: 'g', constraints: [], files: [], findings: [],
