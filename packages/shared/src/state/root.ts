@@ -32,10 +32,12 @@ export const RootState = Annotation.Root({
   // plan produced by plannerNode (was silently dropped before — no annotation existed)
   plan: Annotation<PlannerOutput | null>({ reducer: (_, n) => n, default: () => null }),
   planApproved: Annotation<boolean | null>({ reducer: (_, n) => n, default: () => null }),
-  // written back by the executor subgraph at finalize
-  // nodes MUST return only NEW items (delta); the reducer appends them
+  // Written back by the executor subgraph at finalize. Last-writer-wins (NOT
+  // concat): the executor accumulates internally with its own concat reducer and
+  // returns its full list, so the root takes it wholesale. Concat here would
+  // re-append the inherited list and double every result on a second run.
   stepResults: Annotation<StepResult[]>({
-    reducer: (prev, next) => prev.concat(next),
+    reducer: (_, n) => n,
     default: () => [],
   }),
 });

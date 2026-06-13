@@ -24,5 +24,11 @@ export const contextNode = async (state: RootStateType) => {
   state.context = context;
   state.messages = [new SystemMessage(buildSystemPrompt(ctx))];
 
+  // Reset per-run executor state so results/approval from a prior turn on this
+  // session thread don't leak into this one (contextNode runs first on every
+  // fresh invoke; resumes re-enter at the interrupted node and skip this reset).
+  state.stepResults = [];
+  state.planApproved = null;
+
   return state;
 };

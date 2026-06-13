@@ -1,8 +1,7 @@
 import { interrupt } from '@langchain/langgraph';
 import { EventBus } from '@robocode-packages/core';
 import { debug } from '@robocode-packages/shared';
-import type { RootStateType } from '@robocode-packages/shared';
-import type { PlannerOutput } from '@robocode-packages/shared';
+import type { RootStateType, PlannerOutput } from '@robocode-packages/shared';
 
 const formatPlan = (plan: PlannerOutput): string => {
   const steps = plan.steps
