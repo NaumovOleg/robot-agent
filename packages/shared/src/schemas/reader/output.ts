@@ -28,6 +28,24 @@ const clipStr =
     return t.length > max ? t.slice(0, max) : t;
   };
 
+// LLM/AST robustness: params & calls arrive as either plain strings or structured
+// objects ({ name }, { text }, { callee }, …). Coerce any element to its string
+// name and drop anything unrenderable, so a thin/odd shape never fails the parse.
+const toNameArray = (v: unknown): unknown => {
+  if (!Array.isArray(v)) return v == null ? [] : v;
+  return v
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const o = item as Record<string, unknown>;
+        const name = o.name ?? o.text ?? o.callee ?? o.identifier ?? o.value;
+        return typeof name === 'string' ? name.trim() : null;
+      }
+      return null;
+    })
+    .filter((s): s is string => typeof s === 'string' && s.length > 0);
+};
+
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
 const RelativeFilePathSchema = z
@@ -86,16 +104,18 @@ const ReaderFunctionSchema = z
     parentNodeType: ShortTextSchema.nullable()
       .default(null)
       .describe('Parent node type for disambiguation. Example: variable_declarator.'),
+    // Optional: the LLM often omits these for a thin "found it here" function.
+    // They are not consumed by the executor digest, so a missing value must not
+    // fail the whole inspect step.
     signature: z
       .string()
       .trim()
-      .min(1)
       .max(1000)
+      .nullable()
+      .default(null)
       .describe('Function signature as observed in source. Do not include body.'),
     params: z
-      .array(z.string().trim().min(1).max(180))
-      .max(60)
-      .default([])
+      .preprocess(toNameArray, z.array(z.string().trim().min(1).max(180)).max(60).default([]))
       .describe('Parameter names or type annotations as they appear in source.'),
     returnType: z
       .string()
@@ -105,36 +125,32 @@ const ReaderFunctionSchema = z
       .nullable()
       .default(null)
       .describe('Return type annotation if present.'),
-    location: LocationSchema.describe(
-      'Location of the function definition. Example: src/app.tsx:43'
-    ),
+    location: LocationSchema.nullable()
+      .default(null)
+      .describe('Location of the function definition. Example: src/app.tsx:43'),
     bodyPreview: z
       .preprocess(clipStr(1400), z.string().min(1).max(1400).nullable().default(null))
       .describe('First 1-5 lines of the function body verbatim. Auto-truncated at 1400 chars.'),
     calls: z
-      .array(IdentifierSchema)
-      .max(120)
-      .default([])
+      .preprocess(toNameArray, z.array(IdentifierSchema).max(120).default([]))
       .describe('Names of functions or hooks called inside this function.'),
   })
-  .strict();
+  // Non-strict: tolerate extra fields the LLM/AST may include (async, exported, …)
+  // rather than rejecting the whole output.
+  .passthrough();
 
 const ReaderClassSchema = z
   .object({
     name: IdentifierSchema.describe('Class name as declared.'),
     methods: z
-      .array(IdentifierSchema)
-      .max(120)
-      .default([])
+      .preprocess(toNameArray, z.array(IdentifierSchema).max(120).default([]))
       .describe('Method names defined on this class.'),
     properties: z
-      .array(IdentifierSchema)
-      .max(120)
-      .default([])
+      .preprocess(toNameArray, z.array(IdentifierSchema).max(120).default([]))
       .describe('Property names defined on this class.'),
-    location: LocationSchema,
+    location: LocationSchema.nullable().default(null),
   })
-  .strict();
+  .passthrough();
 
 const ReaderImportSchema = z
   .object({
@@ -145,9 +161,7 @@ const ReaderImportSchema = z
       .max(260)
       .describe("Import source path or package name. Example: '@hooks', 'react'."),
     specifiers: z
-      .array(IdentifierSchema)
-      .max(80)
-      .default([])
+      .preprocess(toNameArray, z.array(IdentifierSchema).max(80).default([]))
       .describe('Named or default specifiers imported from this source.'),
     isDefault: z.boolean().default(false).describe('True if this is a default import.'),
     location: z
@@ -167,7 +181,7 @@ const ReaderImportSchema = z
       }, z.string().max(300).default(''))
       .describe('File and line where this import statement appears.'),
   })
-  .strict();
+  .passthrough();
 
 const ReaderReferenceUsageSchema = z
   .object({
@@ -479,29 +493,15 @@ export const ReaderOutputSchema = z
     };
 
     data.functions.forEach((fn, i) => {
+      if (!fn.location) return; // location is optional — skip cross-ref when absent
       const file = extractFileFromLocation(fn.location);
-      if (!file) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['functions', i, 'location'],
-          message: `Cannot extract file from location "${fn.location}".`,
-        });
-      } else {
-        ensureAnalyzed(file, ['functions', i, 'location']);
-      }
+      if (file) ensureAnalyzed(file, ['functions', i, 'location']);
     });
 
     data.classes.forEach((cls, i) => {
+      if (!cls.location) return; // location is optional — skip cross-ref when absent
       const file = extractFileFromLocation(cls.location);
-      if (!file) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['classes', i, 'location'],
-          message: `Cannot extract file from location "${cls.location}".`,
-        });
-      } else {
-        ensureAnalyzed(file, ['classes', i, 'location']);
-      }
+      if (file) ensureAnalyzed(file, ['classes', i, 'location']);
     });
 
     data.imports.forEach((imp, i) => {

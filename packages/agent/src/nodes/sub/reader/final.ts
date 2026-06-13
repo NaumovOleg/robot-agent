@@ -1,4 +1,5 @@
 import type { ReaderStateType } from '../../../subagents/reader';
+import type { ReaderOutput } from '@robocode-packages/shared';
 import { debug, ReaderOutputSchema, isAIMessage } from '@robocode-packages/shared';
 import { SystemMessage } from '@langchain/core/messages';
 import { createBaseModel } from '../../../utils';
@@ -122,6 +123,44 @@ function tryRecoverReaderOutput(error: unknown) {
   return validated.data;
 }
 
+// Last-resort recovery: build a minimal, schema-valid `insufficient` output from
+// whatever the LLM produced (its summary + analyzed files) so a parse failure
+// degrades the inspect step to a thin-but-usable digest instead of hard-failing
+// it into escalation. The mini-reader re-reads the files fresh anyway.
+function synthesizeMinimalOutput(error: unknown, state: ReaderStateType): ReaderOutput {
+  const llmOutput = (error as { llmOutput?: unknown })?.llmOutput;
+  const raw = parseJsonRecord(llmOutput);
+
+  const rawSummary = raw && typeof raw.summary === 'string' ? raw.summary.trim() : '';
+  const focus = state.focus ?? [];
+  const summary =
+    rawSummary ||
+    `Partial inspection of ${focus.join(', ') || state.task || 'the target files'}; ` +
+      `the structured reader output could not be fully parsed.`;
+
+  const filesAnalyzed =
+    raw && Array.isArray(raw.filesAnalyzed)
+      ? raw.filesAnalyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
+      : focus;
+
+  const candidate = {
+    schemaVersion: 'reader.output.v2' as const,
+    status: 'insufficient' as const,
+    summary,
+    filesAnalyzed,
+    unresolvedQuestions: [
+      'Reader output could not be fully parsed; proceeding with partial context.',
+    ],
+    potential_edit_strategy: null,
+  };
+
+  const validated = ReaderOutputSchema.safeParse(candidate);
+  if (validated.success) return validated.data;
+  // Schema somehow still rejects (e.g. odd file paths) — return a bare object that
+  // satisfies the type. readerStep treats `insufficient` as a usable digest.
+  return { ...candidate, filesAnalyzed: [] } as unknown as ReaderOutput;
+}
+
 export async function finalReadNode(state: ReaderStateType) {
   const llm = createBaseModel(false).withStructuredOutput(ReaderOutputSchema, {
     method: 'functionCalling',
@@ -138,9 +177,15 @@ export async function finalReadNode(state: ReaderStateType) {
     editIntentInputPayload = await llm.invoke([new SystemMessage(prompt), ...messages]);
   } catch (err) {
     const recovered = tryRecoverReaderOutput(err);
-    if (!recovered) throw err;
-    debug('READER FINAL NODE RECOVERED OUTPUT', recovered);
-    editIntentInputPayload = recovered;
+    if (recovered) {
+      debug('[reader/final] recovered output from raw LLM JSON after parse failure');
+      editIntentInputPayload = recovered;
+    } else {
+      // Never throw: degrade to a minimal insufficient digest so one bad field
+      // doesn't fail the whole inspect step.
+      editIntentInputPayload = synthesizeMinimalOutput(err, state);
+      debug('[reader/final] parse failed; degraded to insufficient digest:', editIntentInputPayload.summary);
+    }
   }
 
   return { editIntentInputPayload };

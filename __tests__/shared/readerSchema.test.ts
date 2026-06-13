@@ -4,7 +4,46 @@ import {
   ReaderOutputSchema,
 } from '../../packages/shared/src/schemas';
 
-describe('reader schemas', () => {
+describe('reader schemas — contract robustness', () => {
+  it('accepts a thin function with only name + location (no signature)', () => {
+    // Exact payload from apps/cli/.robocode/debug.log that previously hard-failed
+    // the inspect step on a missing required `signature`.
+    const parsed = ReaderOutputSchema.parse({
+      summary: 'Extract function info for App in src/app.tsx.',
+      language: 'typescript',
+      filesAnalyzed: ['src/app.tsx'],
+      functions: [{ name: 'App', location: 'src/app.tsx:63' }],
+    });
+    expect(parsed.functions[0]).toMatchObject({ name: 'App', signature: null });
+    expect(parsed.functions[0].params).toEqual([]);
+  });
+
+  it('coerces structured params/calls objects into string arrays', () => {
+    const parsed = ReaderOutputSchema.parse({
+      summary: 's',
+      filesAnalyzed: ['src/a.ts'],
+      functions: [
+        {
+          name: 'f',
+          location: 'src/a.ts:1',
+          params: [{ name: 'a' }, { name: 'b' }],
+          calls: [{ callee: 'useState' }, 'plain'],
+        },
+      ],
+    });
+    expect(parsed.functions[0].params).toEqual(['a', 'b']);
+    expect(parsed.functions[0].calls).toEqual(['useState', 'plain']);
+  });
+
+  it('tolerates extra (passthrough) fields on a function', () => {
+    const parsed = ReaderOutputSchema.parse({
+      summary: 's',
+      filesAnalyzed: ['src/a.ts'],
+      functions: [{ name: 'f', location: 'src/a.ts:1', async: true, exported: true }],
+    });
+    expect(parsed.functions[0].name).toBe('f');
+  });
+
   it('parses valid reader input with defaults', () => {
     const parsed = ReaderInputSchema.parse({
       task: 'Inspect routing logic',
