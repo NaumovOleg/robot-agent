@@ -6,7 +6,7 @@ import { buildSystemPrompt } from '../prompts';
 export const contextNode = async (state: RootStateType) => {
   const context = await buildContext(state);
 
-  const ctx = jsonToXml(state.context, {
+  const ctx = jsonToXml(context, {
     omitEmpty: true,
     arrayConfigs: [
       { path: 'language.aliases', itemTag: 'alias' },
@@ -30,6 +30,8 @@ export const contextNode = async (state: RootStateType) => {
   state.stepResults = [];
   state.planApproved = null;
   state.plan = null;
+  state.router = { userRequests: [] };
+  state.selectedFiles = [];
   state.answer = null;
   state.question = null;
   state.clarificationSource = null;

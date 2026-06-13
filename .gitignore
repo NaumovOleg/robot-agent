@@ -9,6 +9,7 @@ src/examples/mock/*
 *.tsbuildinfo
 *.log
 **/.robocode/*
-
+.robocode/*
+./apps/cli/.robocode/*
 # Visual brainstorm sessions
 .superpowers/

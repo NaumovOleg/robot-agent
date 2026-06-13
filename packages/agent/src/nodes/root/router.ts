@@ -1,6 +1,7 @@
 import type { RootStateType } from '@robocode-packages/shared';
 import { debug } from '@robocode-packages/shared';
 import { routerGraph } from '../../graphs/router';
+export { preRoute } from './preRoute';
 
 export const routerIntentNode = async (state: RootStateType): Promise<Partial<RootStateType>> => {
   const {
@@ -33,23 +34,6 @@ export const routerIntentNode = async (state: RootStateType): Promise<Partial<Ro
   }
 
   return { router, clarificationSource: null, answer: null, question: null };
-};
-
-export const preRoute = ({ answer, router, userRequest }: RootStateType) => {
-  const userRequests = router.userRequests;
-
-  if (answer) {
-    userRequests.push(answer);
-  } else {
-    userRequests.push(userRequest);
-  }
-
-  return {
-    router: { ...router, userRequests },
-    clarificationSource: null,
-    answer: null,
-    question: null,
-  };
 };
 
 export const afterRouterIntent = (state: RootStateType): string => {
