@@ -16,8 +16,6 @@ import {
   applyTextReplace,
 } from './textOps';
 import {
-  applyAstInsert,
-  applyAstRemove,
   applyAstRename,
   applyAstReplace,
 } from './astOps';
@@ -57,10 +55,6 @@ const applyContentEdit = (content: string, edit: Edit, parser: Parser): string =
         return applyAstRename(content, edit as AstEdit, tree);
       case 'replace':
         return applyAstReplace(content, edit as AstEdit, tree);
-      case 'remove':
-        return applyAstRemove(content, edit as AstEdit, tree);
-      case 'insert':
-        return applyAstInsert(content, edit as AstEdit);
     }
   }
 

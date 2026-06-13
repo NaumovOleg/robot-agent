@@ -130,20 +130,3 @@ export const applyAstReplace = (content: string, edit: AstEdit, tree: Tree): str
   const target = node.type === 'variable_declarator' ? node.parent ?? node : node;
   return content.slice(0, target.startIndex) + afterSnippet + content.slice(target.endIndex);
 };
-
-export const applyAstRemove = (content: string, edit: AstEdit, tree: Tree): string => {
-  const { nodeType, symbol, parentNodeType, lines } = edit;
-
-  const node = findNode(tree.rootNode, nodeType, symbol, parentNodeType, lines);
-  if (!node) throw new Error(`[ast/remove] Node not found: ${nodeType} ${symbol ?? ''}`);
-
-  const target = node.type === 'variable_declarator' ? node.parent ?? node : node;
-  const end = content[target.endIndex] === '\n' ? target.endIndex + 1 : target.endIndex;
-  return content.slice(0, target.startIndex) + content.slice(end);
-};
-
-export const applyAstInsert = (content: string, edit: AstEdit): string => {
-  const { insertSnippet } = edit;
-  if (!insertSnippet) throw new Error('[ast/insert] insertSnippet is required');
-  return content.trimEnd() + '\n\n' + insertSnippet + '\n';
-};

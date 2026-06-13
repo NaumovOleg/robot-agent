@@ -44,3 +44,17 @@ export const detectLanguage = (filePath: string): string => {
   };
   return langMap[ext] ?? 'text';
 };
+
+// Languages with a bundled tree-sitter wasm grammar (see packages/shared/src/ast/wasm).
+// AST ops (replace_node, rename_symbol) require one; everything else must fall back
+// to text ops. Keep in sync with the wasm/ directory.
+const AST_WASM_LANGUAGES = new Set([
+  'typescript', 'tsx', 'javascript', 'python', 'go', 'rust',
+  'java', 'c', 'csharp', 'php', 'ruby', 'dart', 'json',
+]);
+
+export const isAstSupported = (filePath: string): boolean => {
+  const ext = path.extname(filePath).toLowerCase();
+  const lang = ext === '.tsx' ? 'tsx' : detectLanguage(filePath);
+  return AST_WASM_LANGUAGES.has(lang);
+};
