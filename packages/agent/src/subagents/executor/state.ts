@@ -8,6 +8,7 @@ import type {
   StepResult,
   VerifyCommands,
   EscalationDecision,
+  MiniReaderStatus,
 } from '@robocode-packages/shared';
 
 const mergeRecord = <V>() => ({
@@ -33,6 +34,16 @@ export const ExecutorState = Annotation.Root({
   stepStates: Annotation<Record<string, StepStatus>>(mergeRecord<StepStatus>()),
   currentStepId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   currentHints: Annotation<ExecutorHint[]>({ reducer: (_, n) => n, default: () => [] as ExecutorHint[] }),
+  // Last mini_reader verdict for this attempt. Drives routing: 'noop' → step done,
+  // 'blocked' → escalate, 'edits' → validate. Reset when a step completes.
+  miniReaderStatus: Annotation<MiniReaderStatus | null>({ reducer: (_, n) => n, default: () => null }),
+  // Per-hint resolution failures from the validate node; consumed by repair.
+  hintErrors: Annotation<{ index: number; op: string; file: string; reason: string }[]>({
+    reducer: (_, n) => n,
+    default: () => [],
+  }),
+  // Bounded counter for the validate→repair loop, per step (reset on step completion).
+  repairCount: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   readerFindings: Annotation<Record<string, ReaderDigest>>(mergeRecord<ReaderDigest>()),
   fileSnapshots: Annotation<Record<string, Record<string, string | null>>>(
     mergeRecord<Record<string, string | null>>()
@@ -75,3 +86,6 @@ export type ExecutorStateType = typeof ExecutorState.State;
 // once (a missing union member, an import path, a bad symbol), so give the loop a
 // few more attempts to converge before escalating to the user.
 export const MAX_STEP_RETRIES = 4;
+// How many times validate→repair may re-prompt the model to fix unresolved anchors
+// before giving up and routing the attempt into the normal step_review retry path.
+export const MAX_REPAIR = 2;
