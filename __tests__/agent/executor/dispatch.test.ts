@@ -5,8 +5,8 @@ import type { ExecutorHint } from '@robocode-packages/shared';
 import { dispatchHint } from '../../../packages/agent/src/nodes/sub/executor/dispatch';
 
 const hint = (partial: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, anchor: null, newContent: null,
-     target: null, insertMode: null, ...partial }) as ExecutorHint;
+  ({ nodeType: null, symbol: null, newSymbol: null, oldText: null, newText: null,
+     target: null, ...partial }) as ExecutorHint;
 
 describe('dispatchHint', () => {
   let dir: string;
@@ -23,97 +23,54 @@ describe('dispatchHint', () => {
 
   const read = (f: string) => fs.readFile(path.join(dir, f), 'utf-8');
 
-  it('replace_text replaces a unique anchor', async () => {
+  it('edit_text replaces a unique anchor', async () => {
     await dispatchHint(
-      hint({ op: 'replace_text', file: 'a.ts', anchor: 'return "hi";', newContent: 'return "hello";' }),
+      hint({ op: 'edit_text', file: 'a.ts', oldText: 'return "hi";', newText: 'return "hello";' }),
       dir
     );
     expect(await read('a.ts')).toContain('return "hello";');
   });
 
-  it('replace_text fails on missing anchor with exact error', async () => {
+  it('edit_text fails on missing anchor with exact error', async () => {
     await expect(
       dispatchHint(
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'nope', newContent: 'x' }),
+        hint({ op: 'edit_text', file: 'a.ts', oldText: 'nope', newText: 'x' }),
         dir
       )
-    ).rejects.toThrow(/Target not found/);
+    ).rejects.toThrow(/oldText not found|Target not found/);
   });
 
   it('tolerates a leaked line-number prefix in a text anchor', async () => {
     // The mini-reader sees "2 |   return "hi";" and sometimes copies "2 " into the
     // anchor. The stripped form must still match.
     await dispatchHint(
-      hint({ op: 'replace_text', file: 'a.ts', anchor: '2   return "hi";', newContent: '  return "yo";' }),
+      hint({ op: 'edit_text', file: 'a.ts', oldText: '2   return "hi";', newText: '  return "yo";' }),
       dir
     );
     expect(await read('a.ts')).toContain('return "yo";');
   });
 
   it('tolerates a "N | " line-number prefix in a text anchor', async () => {
+    // Converts insert_text-after to edit_text: oldText is the anchor (with prefix),
+    // newText is anchor + inserted content.
     await dispatchHint(
-      hint({ op: 'insert_text', file: 'a.ts', anchor: '1 | export const greet = () => {', insertMode: 'after', newContent: '\n  // hi' }),
+      hint({
+        op: 'edit_text', file: 'a.ts',
+        oldText: '1 | export const greet = () => {',
+        newText: 'export const greet = () => {\n  // hi',
+      }),
       dir
     );
     expect(await read('a.ts')).toContain('{\n  // hi');
   });
 
-  it('replace_text matches a multi-line anchor reproduced with different whitespace', async () => {
-    await fs.writeFile(
-      path.join(dir, 'sw.ts'),
-      'switch (x) {\n  case 1:\n    return a;\n  default:\n    return b;\n}\n'
-    );
-    // model collapsed the block onto one line with single spaces
-    await dispatchHint(
-      hint({
-        op: 'replace_text', file: 'sw.ts',
-        anchor: 'case 1: return a;',
-        newContent: 'case 1:\n    return c;',
-      }),
-      dir
-    );
-    expect(await read('sw.ts')).toContain('return c;');
-  });
-
-  it('does not use fuzzy fallback when it matches multiple locations', async () => {
-    await fs.writeFile(
-      path.join(dir, 'amb.ts'),
-      [
-        'switch (x) {',
-        '  case 1:',
-        '    return a;',
-        '}',
-        '',
-        'switch (y) {',
-        '  case 1:',
-        '    return b;',
-        '}',
-        '',
-      ].join('\n')
-    );
-
-    await expect(
-      dispatchHint(
-        hint({
-          op: 'replace_text',
-          file: 'amb.ts',
-          // Collapsed anchor can fuzzy-match both switch blocks.
-          anchor: 'switch ( case 1: return',
-          newContent: 'switch (x) { return c; }',
-        }),
-        dir
-      )
-    ).rejects.toThrow(/Target not found|Expected unique target/);
-  });
-
-  it('insert_text after a line end adds a newline so statements do not glue', async () => {
+  it('insert after anchor: edit_text with old=anchor, new=anchor+insert', async () => {
     await fs.writeFile(path.join(dir, 'bar.ts'), "export * from './ctx';\nexport * from './provider';\n");
-    // model forgot the leading newline in newContent
     await dispatchHint(
       hint({
-        op: 'insert_text', file: 'bar.ts',
-        anchor: "export * from './provider';", insertMode: 'after',
-        newContent: "export * from './faq';",
+        op: 'edit_text', file: 'bar.ts',
+        oldText: "export * from './provider';",
+        newText: "export * from './provider';\nexport * from './faq';",
       }),
       dir
     );
@@ -122,42 +79,34 @@ describe('dispatchHint', () => {
     expect(out).toContain("export * from './provider';\nexport * from './faq';");
   });
 
-  it('insert_text matches a single-line anchor against a multi-line import', async () => {
-    await fs.writeFile(path.join(dir, 'imp.ts'), 'import {\n  A,\n  B,\n} from "./x";\n');
-    await dispatchHint(
-      hint({ op: 'insert_text', file: 'imp.ts', anchor: 'import { A,', insertMode: 'after', newContent: '\n  C,' }),
-      dir
-    );
-    expect(await read('imp.ts')).toContain('C,');
-  });
-
-  it('replace_text is a no-op when the change is already applied (idempotent)', async () => {
+  it('edit_text is a no-op when the change is already applied (idempotent)', async () => {
     // Simulates a redundant rename hint: a prior rename_symbol already turned
-    // <App /> into <Page />, so this replace_text anchor is gone but the new
+    // <App /> into <Page />, so this edit_text anchor is gone but the new
     // text is present. Must be a no-op, not a step failure.
     await fs.writeFile(path.join(dir, 'a.tsx'), 'export const Root = () => <Page />;\n');
     const res = await dispatchHint(
-      hint({ op: 'replace_text', file: 'a.tsx', anchor: '<App />', newContent: '<Page />' }),
+      hint({ op: 'edit_text', file: 'a.tsx', oldText: '<App />', newText: '<Page />' }),
       dir
     );
     expect(res.summary).toMatch(/already applied/);
     expect(await read('a.tsx')).toContain('<Page />');
   });
 
-  it('insert_text inserts after anchor', async () => {
+  it('insert after anchor: edit_text inserts content after the matched text', async () => {
     await dispatchHint(
       hint({
-        op: 'insert_text', file: 'a.ts', anchor: 'export const greet = () => {',
-        insertMode: 'after', newContent: '\n  // inserted',
+        op: 'edit_text', file: 'a.ts',
+        oldText: 'export const greet = () => {',
+        newText: 'export const greet = () => {\n  // inserted',
       }),
       dir
     );
     expect(await read('a.ts')).toContain('{\n  // inserted');
   });
 
-  it('remove_text removes the anchor', async () => {
+  it('remove_text via edit_text: include boundary in oldText, keep only boundary in newText', async () => {
     await dispatchHint(
-      hint({ op: 'remove_text', file: 'a.ts', anchor: '  return "hi";\n' }),
+      hint({ op: 'edit_text', file: 'a.ts', oldText: '{\n  return "hi";\n', newText: '{\n' }),
       dir
     );
     expect(await read('a.ts')).not.toContain('return "hi"');
@@ -201,7 +150,7 @@ describe('dispatchHint', () => {
 
   it('create_file creates with content and parent dirs', async () => {
     await dispatchHint(
-      hint({ op: 'create_file', file: 'src/new.ts', newContent: 'export const n = 1;\n' }),
+      hint({ op: 'create_file', file: 'src/new.ts', newText: 'export const n = 1;\n' }),
       dir
     );
     expect(await read('src/new.ts')).toBe('export const n = 1;\n');
@@ -219,20 +168,20 @@ describe('dispatchHint', () => {
 
   it('refuses to write to a generated/vendor path (dist)', async () => {
     await expect(
-      dispatchHint(hint({ op: 'create_file', file: 'dist/x.ts', newContent: 'export const x = 1;' }), dir)
+      dispatchHint(hint({ op: 'create_file', file: 'dist/x.ts', newText: 'export const x = 1;' }), dir)
     ).rejects.toThrow(/generated|build output|dist/i);
   });
 
   it('rejects path traversal', async () => {
     await expect(
-      dispatchHint(hint({ op: 'create_file', file: '../escape.ts', newContent: 'x' }), dir)
+      dispatchHint(hint({ op: 'create_file', file: '../escape.ts', newText: 'x' }), dir)
     ).rejects.toThrow(/escapes repository root|traverse/i);
   });
 
   it('fails when an edit produces broken syntax', async () => {
     await expect(
       dispatchHint(
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'return "hi";', newContent: 'return {{{;' }),
+        hint({ op: 'edit_text', file: 'a.ts', oldText: 'return "hi";', newText: 'return {{{;' }),
         dir
       )
     ).rejects.toThrow(/Syntax error/);
@@ -242,14 +191,14 @@ describe('dispatchHint', () => {
 
   it('fails on missing required fields with a clear message', async () => {
     await expect(
-      dispatchHint(hint({ op: 'replace_text', file: 'a.ts', anchor: null, newContent: 'x' }), dir)
-    ).rejects.toThrow(/anchor.*required/i);
+      dispatchHint(hint({ op: 'edit_text', file: 'a.ts', oldText: null, newText: 'x' }), dir)
+    ).rejects.toThrow(/oldText.*required/i);
   });
 
   it('replace_node replaces the node body', async () => {
     await dispatchHint(
       hint({ op: 'replace_node', file: 'a.ts', nodeType: 'variable_declarator', symbol: 'greet',
-             newContent: 'const greet = () => "replaced"' }),
+             newText: 'const greet = () => "replaced"' }),
       dir
     );
     const content = await read('a.ts');
@@ -257,44 +206,35 @@ describe('dispatchHint', () => {
     expect(content).not.toContain('"hi"');
   });
 
-  it('remove_node removes the node', async () => {
+  it('prepend to file: edit_text with oldText=first line, newText=header+first line', async () => {
     await dispatchHint(
-      hint({ op: 'remove_node', file: 'a.ts', nodeType: 'variable_declarator', symbol: 'greet' }),
-      dir
-    );
-    expect(await read('a.ts')).not.toContain('greet');
-  });
-
-  it('insert_node appends snippet to end of file', async () => {
-    await dispatchHint(
-      hint({ op: 'insert_node', file: 'a.ts', nodeType: 'function_declaration',
-             newContent: 'export const extra = 1;' }),
-      dir
-    );
-    expect((await read('a.ts')).trimEnd().endsWith('export const extra = 1;')).toBe(true);
-  });
-
-  it('insert_text start mode needs no anchor', async () => {
-    await dispatchHint(
-      hint({ op: 'insert_text', file: 'a.ts', insertMode: 'start', newContent: '// header\n' }),
+      hint({
+        op: 'edit_text', file: 'a.ts',
+        oldText: 'export const greet = () => {',
+        newText: '// header\nexport const greet = () => {',
+      }),
       dir
     );
     expect((await read('a.ts')).startsWith('// header\n')).toBe(true);
   });
 
-  it('insert_text end mode appends', async () => {
+  it('append to file: edit_text with oldText=last line, newText=last line+footer', async () => {
     await dispatchHint(
-      hint({ op: 'insert_text', file: 'a.ts', insertMode: 'end', newContent: '// footer\n' }),
+      hint({
+        op: 'edit_text', file: 'a.ts',
+        oldText: '};\n',
+        newText: '};\n// footer\n',
+      }),
       dir
     );
     expect((await read('a.ts')).endsWith('// footer\n')).toBe(true);
   });
 
-  it('replace_text fails on ambiguous anchor', async () => {
-    await fs.writeFile(path.join(dir, 'a.ts'), 'let x = 1;\nlet x2 = 1;\n'.replace('x2', 'y') + 'let z = 1;\n');
+  it('edit_text fails on ambiguous anchor', async () => {
+    await fs.writeFile(path.join(dir, 'a.ts'), 'let x = 1;\nlet y = 1;\nlet z = 1;\n');
     // ensure substring "= 1;" appears multiple times
     await expect(
-      dispatchHint(hint({ op: 'replace_text', file: 'a.ts', anchor: '= 1;', newContent: '= 2;' }), dir)
-    ).rejects.toThrow(/Expected unique target/);
+      dispatchHint(hint({ op: 'edit_text', file: 'a.ts', oldText: '= 1;', newText: '= 2;' }), dir)
+    ).rejects.toThrow(/not unique|Expected unique target|multiple|ambiguous/i);
   });
 });

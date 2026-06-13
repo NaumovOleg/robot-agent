@@ -17,28 +17,6 @@ describe('ExecutorHintSchema extensions', () => {
     expect(hint.target).toBe('src/b.ts');
   });
 
-  it('accepts insert_text with insertMode', () => {
-    const hint = ExecutorHintSchema.parse({
-      op: 'insert_text',
-      file: 'src/a.ts',
-      anchor: 'const x = 1;',
-      insertMode: 'after',
-      newContent: '\nconst y = 2;',
-    });
-    expect(hint.insertMode).toBe('after');
-  });
-
-  it('rejects insert_text before/after without anchor', () => {
-    expect(() =>
-      ExecutorHintSchema.parse({
-        op: 'insert_text',
-        file: 'src/a.ts',
-        insertMode: 'after',
-        newContent: 'const y = 2;',
-      })
-    ).toThrow(/anchor is required/i);
-  });
-
   it('rejects rename_symbol when newSymbol equals symbol', () => {
     expect(() =>
       ExecutorHintSchema.parse({
@@ -53,10 +31,10 @@ describe('ExecutorHintSchema extensions', () => {
   it('rejects path traversal in hint file path', () => {
     expect(() =>
       ExecutorHintSchema.parse({
-        op: 'replace_text',
+        op: 'edit_text',
         file: '../escape.ts',
-        anchor: 'x',
-        newContent: 'y',
+        oldText: 'x',
+        newText: 'y',
       })
     ).toThrow(/relative to the repository root/i);
   });

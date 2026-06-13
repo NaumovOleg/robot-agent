@@ -15,8 +15,8 @@ const mkState = (cwd: string, hints: ExecutorHint[], extra: Record<string, unkno
   }) as never;
 
 const hint = (partial: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, anchor: null, newContent: null,
-     target: null, insertMode: null, ...partial }) as ExecutorHint;
+  ({ nodeType: null, symbol: null, newSymbol: null, oldText: null, newText: null,
+     target: null, ...partial }) as ExecutorHint;
 
 describe('applyNode', () => {
   let dir: string;
@@ -29,8 +29,8 @@ describe('applyNode', () => {
   it('snapshots target files, applies all hints in order, records appliedOps', async () => {
     const res = await applyNode(
       mkState(dir, [
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'const a = 1;', newContent: 'const a = 2;' }),
-        hint({ op: 'insert_text', file: 'a.ts', anchor: 'const a = 2;', insertMode: 'after', newContent: '\nconst b = 3;' }),
+        hint({ op: 'edit_text', file: 'a.ts', oldText: 'const a = 1;', newText: 'const a = 2;' }),
+        hint({ op: 'edit_text', file: 'a.ts', oldText: 'const a = 2;', newText: 'const a = 2;\nconst b = 3;' }),
       ])
     );
     expect(res.lastError).toBeNull();
@@ -44,7 +44,7 @@ describe('applyNode', () => {
     const res = await applyNode(
       mkState(
         dir,
-        [hint({ op: 'replace_text', file: 'a.ts', anchor: 'const a = 1;', newContent: 'const a = 5;' })],
+        [hint({ op: 'edit_text', file: 'a.ts', oldText: 'const a = 1;', newText: 'const a = 5;' })],
         { fileSnapshots: { 'edit-a': { 'a.ts': 'PRISTINE' } } }
       )
     );
@@ -63,12 +63,12 @@ describe('applyNode', () => {
   it('stops at the first failing hint and reports which one', async () => {
     const res = await applyNode(
       mkState(dir, [
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'NOPE', newContent: 'x' }),
-        hint({ op: 'create_file', file: 'never.ts', newContent: 'x' }),
+        hint({ op: 'edit_text', file: 'a.ts', oldText: 'NOPE', newText: 'x' }),
+        hint({ op: 'create_file', file: 'never.ts', newText: 'x' }),
       ])
     );
     expect(res.lastError).toMatch(/hint 1\/2/);
-    expect(res.lastError).toMatch(/Target not found/);
+    expect(res.lastError).toMatch(/oldText not found|Target not found/);
     await expect(fs.access(path.join(dir, 'never.ts'))).rejects.toThrow();
   });
 });

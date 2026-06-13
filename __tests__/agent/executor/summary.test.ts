@@ -5,8 +5,8 @@ import {
 } from '../../../packages/agent/src/nodes/sub/executor/summary';
 
 const hint = (p: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, anchor: null, newContent: null,
-     target: null, insertMode: null, ...p }) as ExecutorHint;
+  ({ nodeType: null, symbol: null, newSymbol: null, oldText: null, newText: null,
+     target: null, ...p }) as ExecutorHint;
 
 describe('summarizeHint', () => {
   it('describes a rename with old→new', () => {
@@ -17,8 +17,8 @@ describe('summarizeHint', () => {
 
   it('describes a text op with a clipped anchor', () => {
     expect(
-      summarizeHint(hint({ op: 'replace_text', file: 'a.ts', anchor: 'const x = 1;' }))
-    ).toBe('replace_text a.ts @"const x = 1;"');
+      summarizeHint(hint({ op: 'edit_text', file: 'a.ts', oldText: 'const x = 1;' }))
+    ).toBe('edit_text a.ts @"const x = 1;"');
   });
 
   it('describes a file op', () => {

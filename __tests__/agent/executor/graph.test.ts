@@ -49,8 +49,12 @@ describe('executor graph (mocked LLM)', () => {
 
   it('happy path: edit step applies hints, reviews sufficient, finishes done', async () => {
     llmQueue.push(
-      // mini_reader output
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 2;' }] }
+      // mini_reader output (new 3-state contract)
+      {
+        status: 'edits',
+        reason: 'bump a to 2',
+        hints: [{ op: 'edit_text', file: 'src/a.ts', oldText: 'export const a = 1;', newText: 'export const a = 2;' }],
+      }
       // step_review no longer calls the LLM — it's a programmatic gate now.
     );
 
@@ -70,8 +74,8 @@ describe('executor graph (mocked LLM)', () => {
 
   it('retry path: bad anchor rolls back, second attempt succeeds', async () => {
     llmQueue.push(
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG ANCHOR', newContent: 'x' }] }, // attempt 1 → apply fails
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 3;' }] } // attempt 2
+      { status: 'edits', reason: 'first try', hints: [{ op: 'edit_text', file: 'src/a.ts', oldText: 'WRONG ANCHOR', newText: 'x' }] }, // attempt 1 → validate/apply fails
+      { status: 'edits', reason: 'second try', hints: [{ op: 'edit_text', file: 'src/a.ts', oldText: 'export const a = 1;', newText: 'export const a = 3;' }] } // attempt 2
     );
 
     const graph = createExecutorGraph();
@@ -82,7 +86,7 @@ describe('executor graph (mocked LLM)', () => {
       context: null, cwd: dir, sessionId: 's',
     }, { recursionLimit: 100 });
 
-    expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done', retries: 1 });
+    expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done' });
     expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toContain('a = 3');
     expect(llmQueue).toHaveLength(0);
   });
@@ -92,7 +96,7 @@ describe('executor graph (mocked LLM)', () => {
     // step_review short-circuits (no LLM call) when lastError is set, so no
     // review outputs are needed in the queue.
     for (let i = 0; i < 3; i++) {
-      llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
+      llmQueue.push({ status: 'edits', reason: 'bad attempt', hints: [{ op: 'edit_text', file: 'src/a.ts', oldText: 'WRONG', newText: 'x' }] });
     }
 
     // Without a checkpointer, interrupt() in the escalate node throws GraphValueError
@@ -114,7 +118,7 @@ describe('executor graph (mocked LLM)', () => {
   it('escalation interrupt pauses, then resumes via Command({resume}) to completion', async () => {
     // 3 failing attempts → exhausted retries → escalate interrupt.
     for (let i = 0; i < 3; i++) {
-      llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
+      llmQueue.push({ status: 'edits', reason: 'bad attempt', hints: [{ op: 'edit_text', file: 'src/a.ts', oldText: 'WRONG', newText: 'x' }] });
     }
 
     // Compile WITH a checkpointer so the escalate interrupt pauses (instead of

@@ -60,12 +60,12 @@ describe('buildMiniReaderPrompt', () => {
       step, goal: 'g', constraints: [], files: [], findings: [],
       lastError: 'Type check failed: error TS2304',
       userGuidance: 'use the existing helper',
-      appliedOps: ['replace_text src/a.ts'],
+      appliedOps: ['edit_text src/a.ts'],
     });
     expect(prompt).toContain('PREVIOUS ATTEMPT FAILED');
     expect(prompt).toContain('error TS2304');
     expect(prompt).toContain('use the existing helper');
-    expect(prompt).toContain('replace_text src/a.ts');
+    expect(prompt).toContain('edit_text src/a.ts');
   });
 
   it('truncates oversized file content', () => {
