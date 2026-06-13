@@ -2,7 +2,7 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import type { PlannerStateType } from '@robocode-packages/shared';
 import { PlannerOutputSchema, debug } from '@robocode-packages/shared';
 import { getModel } from '../../utils';
-import { buildPlannerPrompt } from './prompt';
+import { buildPlannerPrompt } from '../../prompts/planner';
 
 // ─── classifyPlanNode ─────────────────────────────────────────────────────────
 // Core LLM call. Produces PlannerOutput.

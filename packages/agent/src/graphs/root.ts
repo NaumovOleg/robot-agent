@@ -1,6 +1,5 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
 import { Checkpointer } from '@robocode-packages/core';
-import type { RootStateType } from '@robocode-packages/shared';
 import { RootState } from '@robocode-packages/shared';
 import {
   contextNode,
@@ -13,11 +12,12 @@ import {
   fileSelectorNode,
   afterAsk,
 } from '../nodes';
+import { planApprovalNode } from '../nodes/root/planApproval';
+import { executorReportNode } from '../nodes/root/executorReport';
+import { executorGraph } from '../subagents/executor';
+import { afterPlanner, afterPlanApproval } from './rootRouting';
 
-const afterPlanner = (state: RootStateType): string => {
-  if (state.clarificationSource === 'planner') return 'question_node';
-  return 'agent'; // → replace with 'reader' when ready
-};
+export { afterPlanner, afterPlanApproval } from './rootRouting';
 
 export function buildGraph() {
   const checkpointer = Checkpointer.getInstance();
@@ -29,6 +29,9 @@ export function buildGraph() {
     .addNode('file_selector', fileSelectorNode)
     .addNode('planner', plannerNode)
     .addNode('question_node', askUserNode)
+    .addNode('plan_approval', planApprovalNode)
+    .addNode('executor', executorGraph as never)
+    .addNode('executor_report', executorReportNode)
     .addNode('agent', rootAgentNode)
     .addEdge(START, 'context_node')
     .addEdge('context_node', 'pre_route')
@@ -45,8 +48,17 @@ export function buildGraph() {
 
     .addConditionalEdges('planner', afterPlanner, {
       question_node: 'question_node',
+      plan_approval: 'plan_approval',
       agent: 'agent',
     })
+
+    .addConditionalEdges('plan_approval', afterPlanApproval, {
+      executor: 'executor',
+      agent: 'agent',
+    })
+
+    .addEdge('executor', 'executor_report')
+    .addEdge('executor_report', 'agent')
 
     .addConditionalEdges('question_node', afterAsk, {
       pre_route: 'pre_route',

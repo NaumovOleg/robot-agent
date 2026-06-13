@@ -1,4 +1,3 @@
-import { EventBus } from '@robocode-packages/core';
 import { debug } from '@robocode-packages/shared';
 import type { RootStateType } from '@robocode-packages/shared';
 import { plannerGraph } from '../../graphs/planner';
@@ -27,7 +26,8 @@ export const plannerNode = async (state: RootStateType) => {
   if (!plan) return {};
 
   debug('[plannerNode] plan resolved', plan);
-  EventBus.emit('agent:pending-plan', { sessionId, plan });
+  // NOTE: agent:pending-plan was a bogus event key (typo). Plan approval
+  // emission now lives in planApprovalNode (agent:plan_pending).
 
   // needs clarification → route to ask_user
   if (plan.clarifying_questions && plan.clarifying_questions.length > 0) {

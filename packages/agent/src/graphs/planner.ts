@@ -1,6 +1,8 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { PlannerState, type PlannerStateType } from '@robocode-packages/shared';
-import { classifyPlanNode, validatePlanNode, fallbackPlanNode } from '../nodes';
+import { classifyPlanNode } from '../nodes/planner/classifyPlanNode';
+import { validatePlanNode } from '../nodes/planner/validatePlanNode';
+import { fallbackPlanNode } from '../nodes/planner/fallbackPlanNode';
 
 const MAX_RETRIES = 3;
 
