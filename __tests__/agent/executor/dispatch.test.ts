@@ -58,6 +58,32 @@ describe('dispatchHint', () => {
     expect(await read('a.ts')).toContain('{\n  // hi');
   });
 
+  it('replace_text matches a multi-line anchor reproduced with different whitespace', async () => {
+    await fs.writeFile(
+      path.join(dir, 'sw.ts'),
+      'switch (x) {\n  case 1:\n    return a;\n  default:\n    return b;\n}\n'
+    );
+    // model collapsed the block onto one line with single spaces
+    await dispatchHint(
+      hint({
+        op: 'replace_text', file: 'sw.ts',
+        anchor: 'case 1: return a;',
+        newContent: 'case 1:\n    return c;',
+      }),
+      dir
+    );
+    expect(await read('sw.ts')).toContain('return c;');
+  });
+
+  it('insert_text matches a single-line anchor against a multi-line import', async () => {
+    await fs.writeFile(path.join(dir, 'imp.ts'), 'import {\n  A,\n  B,\n} from "./x";\n');
+    await dispatchHint(
+      hint({ op: 'insert_text', file: 'imp.ts', anchor: 'import { A,', insertMode: 'after', newContent: '\n  C,' }),
+      dir
+    );
+    expect(await read('imp.ts')).toContain('C,');
+  });
+
   it('replace_text is a no-op when the change is already applied (idempotent)', async () => {
     // Simulates a redundant rename hint: a prior rename_symbol already turned
     // <App /> into <Page />, so this replace_text anchor is gone but the new

@@ -44,12 +44,35 @@ const requireField = <T>(value: T | null | undefined, field: string, op: string)
 // line-number artifact stripped — but only when the stripped form actually
 // matches, so legitimate anchors that begin with a number are never harmed.
 const LINE_NUMBER_PREFIX = /^\s*\d+\s*\|?\s+/;
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Whitespace-tolerant match: the model often reproduces an anchor with different
+// indentation or collapses a multi-line span (e.g. a multi-line import or a whole
+// switch block) onto fewer lines. Match the anchor's non-whitespace tokens against
+// the file allowing ANY whitespace between them, and return the file's ACTUAL span
+// so the edit applies verbatim. Returns null if there is no single such span.
+const fuzzyWhitespaceAnchor = (content: string, anchor: string): string | null => {
+  const tokens = anchor.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return null;
+  const re = new RegExp(tokens.map(escapeRegExp).join('\\s+'));
+  const match = content.match(re);
+  return match ? match[0] : null;
+};
+
 const resolveAnchor = (content: string, anchor: string): string => {
   if (content.includes(anchor)) return anchor;
+
+  // 1) strip a leaked line-number prefix
   const stripped = anchor.replace(LINE_NUMBER_PREFIX, '');
   if (stripped !== anchor && stripped.length > 0 && content.includes(stripped)) {
     return stripped;
   }
+
+  // 2) whitespace-tolerant match (handles re-indentation / collapsed line breaks)
+  const fuzzy = fuzzyWhitespaceAnchor(content, stripped.length > 0 ? stripped : anchor);
+  if (fuzzy) return fuzzy;
+
   return anchor; // unchanged — let the underlying op throw a clear error
 };
 
