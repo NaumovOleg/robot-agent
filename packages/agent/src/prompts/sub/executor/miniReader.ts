@@ -17,6 +17,8 @@ export interface MiniReaderPromptInput {
   errorFiles?: { file: string; content: string }[];
   // Project import path aliases (e.g. "@screens" → "src/screens/index.ts").
   aliases?: { alias: string; path: string }[];
+  // The type errors still outstanding for this step (persist across retries).
+  outstandingErrors?: string | null;
   lastError: string | null;
   userGuidance: string | null;
   appliedOps: string[];
@@ -31,7 +33,7 @@ export const withLineNumbers = (content: string): string =>
     .join('\n');
 
 export const buildMiniReaderPrompt = (input: MiniReaderPromptInput): string => {
-  const { step, goal, constraints, files, findings, producedFiles, references, errorFiles, aliases, lastError, userGuidance, appliedOps } =
+  const { step, goal, constraints, files, findings, producedFiles, references, errorFiles, aliases, outstandingErrors, lastError, userGuidance, appliedOps } =
     input;
 
   const referenceBlocks = (references ?? [])
@@ -134,6 +136,17 @@ ${aliasBlock}
 The last type check reported errors in these files. Emit hints to fix them — e.g.
 add a missing union member, fix an import path — in addition to the step's files.
 ${errorFileBlocks}
+`
+    : ''
+}${
+  outstandingErrors
+    ? `
+## Outstanding type errors you MUST resolve (still failing)
+Fix ALL of these. They persist until the whole project type-checks; do not lose
+track of them even if your previous attempt failed on something else.
+\`\`\`
+${outstandingErrors}
+\`\`\`
 `
     : ''
 }## Current file contents (fresh from disk, line-numbered)

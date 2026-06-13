@@ -71,4 +71,7 @@ export const ExecutorState = Annotation.Root({
 });
 
 export type ExecutorStateType = typeof ExecutorState.State;
-export const MAX_STEP_RETRIES = 2;
+// The final mutating step often has to resolve several cross-file type errors at
+// once (a missing union member, an import path, a bad symbol), so give the loop a
+// few more attempts to converge before escalating to the user.
+export const MAX_STEP_RETRIES = 4;

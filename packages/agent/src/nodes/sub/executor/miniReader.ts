@@ -85,6 +85,7 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     references: uniqueReferences,
     errorFiles,
     aliases,
+    outstandingErrors: state.verifyOutput,
     lastError: state.lastError,
     userGuidance: state.userGuidance,
     appliedOps: state.appliedOps[step.id] ?? [],

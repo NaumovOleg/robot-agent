@@ -33,6 +33,21 @@ export const checkSyntax = async (
   if (!tree || !tree.rootNode.hasError) return { ok: true };
 
   const errNode = findFirstError(tree.rootNode);
-  const line = (errNode?.startPosition.row ?? 0) + 1;
-  return { ok: false, error: `Syntax error near line ${line} in ${filePath}` };
+  const row = errNode?.startPosition.row ?? 0;
+  const line = row + 1;
+
+  // Include the offending line and a little context so the editor can SEE what it
+  // produced wrong — "Syntax error near line N" alone is not actionable.
+  const lines = content.split('\n');
+  const from = Math.max(0, row - 1);
+  const to = Math.min(lines.length, row + 2);
+  const snippet = lines
+    .slice(from, to)
+    .map((l, i) => `${from + i + 1} | ${l}`)
+    .join('\n');
+
+  return {
+    ok: false,
+    error: `Syntax error near line ${line} in ${filePath} (the edit produced invalid code):\n${snippet}`,
+  };
 };

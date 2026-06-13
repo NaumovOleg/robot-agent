@@ -76,11 +76,13 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
   if (snapshot) await restoreSnapshot(cwd, snapshot);
 
   if (outcome === 'retry') {
+    // Keep verifyOutput/errorFiles so the next attempt still sees the OUTSTANDING
+    // type errors to resolve — even if THIS attempt failed on something else
+    // (e.g. a syntax slip) that overwrote lastError.
     return {
       retryCounts: { [currentStepId]: retries + 1 },
       lastError: reason,
       currentHints: [],
-      verifyOutput: null,
       verifyPassed: null,
     };
   }
