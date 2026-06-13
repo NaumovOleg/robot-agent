@@ -3,6 +3,7 @@ import { debug, runCommand } from '@robocode-packages/shared';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
 import { findRelatedTestFile } from './relatedTest';
 import { parseVerifyErrors, newVerifyErrors, errorFilesFrom } from './verifyErrors';
+import { isIgnoredPath } from './ignorePaths';
 
 const TAIL = 1200;
 const tail = (s: string): string => (s.length > TAIL ? '…' + s.slice(-TAIL) : s);
@@ -34,7 +35,14 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
   if (verifyCommands.typeCheck && isLastMutation(state)) {
     ranAnyCheck = true;
     const result = await runCommand(verifyCommands.typeCheck, cwd);
-    const introduced = newVerifyErrors(parseVerifyErrors(result.output), baselineErrors);
+    // Ignore errors in generated/vendor output (dist, node_modules, …): the loop
+    // edits source, not build artifacts, so it could never fix those anyway.
+    const introduced = newVerifyErrors(parseVerifyErrors(result.output), baselineErrors).filter(
+      (sig) => {
+        const file = sig.split('|')[0]?.trim();
+        return !(file && file !== sig && isIgnoredPath(file));
+      }
+    );
     const failed = introduced.length > 0;
     EventBus.emit('executor:step:verify', {
       sessionId, stepId: currentStepId, command: verifyCommands.typeCheck, ok: !failed,

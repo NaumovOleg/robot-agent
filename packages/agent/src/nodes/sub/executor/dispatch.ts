@@ -15,6 +15,7 @@ import {
   checkSyntax,
   createAstParser,
 } from '@robocode-packages/shared';
+import { isIgnoredPath } from './ignorePaths';
 
 export interface DispatchResult {
   file: string;
@@ -27,6 +28,13 @@ const resolveInside = (cwd: string, file: string): string => {
   const rel = path.relative(root, abs);
   if (rel.startsWith('..') || path.isAbsolute(rel)) {
     throw new Error(`File path escapes repository root: ${file}`);
+  }
+  // Never write to generated/vendor/VCS output. Fail clearly so the model retries
+  // against a real source file instead of corrupting build artifacts.
+  if (isIgnoredPath(rel)) {
+    throw new Error(
+      `Refusing to edit generated/vendored path "${file}". Edit the source, not build output (dist/, node_modules/, build/, …).`
+    );
   }
   return abs;
 };
@@ -58,6 +66,31 @@ const fuzzyWhitespaceAnchor = (content: string, anchor: string): string | null =
   const re = new RegExp(tokens.map(escapeRegExp).join('\\s+'));
   const match = content.match(re);
   return match ? match[0] : null;
+};
+
+// Models frequently forget the newline when inserting a whole line/statement, so
+// "after"-inserting onto a line that ends with ';' glues two statements together
+// ("provider';export * from '@screens/faq';"). When inserting at a line boundary,
+// add the missing newline separator so the inserted line lands on its own line.
+const lineSeparatedInsert = (
+  content: string,
+  anchor: string,
+  insertMode: 'before' | 'after' | 'start' | 'end',
+  text: string
+): string => {
+  if (insertMode === 'after') {
+    const at = content.indexOf(anchor);
+    const after = at >= 0 ? content[at + anchor.length] : undefined;
+    const atLineEnd = after === '\n' || after === undefined;
+    if (atLineEnd && !text.startsWith('\n')) return '\n' + text;
+  }
+  if (insertMode === 'before') {
+    const at = content.indexOf(anchor);
+    const before = at > 0 ? content[at - 1] : undefined;
+    const atLineStart = before === '\n' || before === undefined;
+    if (atLineStart && !text.endsWith('\n')) return text + '\n';
+  }
+  return text;
 };
 
 const resolveAnchor = (content: string, anchor: string): string => {
@@ -174,11 +207,17 @@ export const dispatchHint = async (
       insertMode === 'start' || insertMode === 'end'
         ? (hint.anchor ?? '')
         : resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
+    const insertText = lineSeparatedInsert(
+      content,
+      anchor,
+      insertMode,
+      requireField(hint.newContent, 'newContent', op)
+    );
     next = applyTextInsert(content, {
       mode: 'text', action: 'insert', file: hint.file,
       anchor: { type: 'exact', value: anchor },
       insertMode,
-      insertText: requireField(hint.newContent, 'newContent', op),
+      insertText,
       reasoning: '',
     });
   } else if (op === 'remove_text') {

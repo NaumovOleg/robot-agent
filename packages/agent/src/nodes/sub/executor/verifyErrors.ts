@@ -1,3 +1,5 @@
+import { isIgnoredPath } from './ignorePaths';
+
 // Parses a type-checker / compiler / linter's output into stable,
 // position-independent error signatures. The verify COMMAND itself is
 // language-driven (context.language.typeCheck → tsc, mypy, cargo check, go build,
@@ -42,12 +44,19 @@ export const newVerifyErrors = (current: string[], baseline: string[] = []): str
 };
 
 // Unique repo-relative files named in error signatures ("file|msg"). Skips
-// absolute and parent-escaping paths so only in-repo files surface.
+// absolute, parent-escaping, and generated/vendor paths (dist, node_modules, …)
+// so the loop never tries to edit build output.
 export const errorFilesFrom = (signatures: string[]): string[] => {
   const files = new Set<string>();
   for (const sig of signatures) {
     const file = sig.split('|')[0]?.trim();
-    if (file && !file.startsWith('/') && !file.startsWith('..') && /[./]/.test(file)) {
+    if (
+      file &&
+      !file.startsWith('/') &&
+      !file.startsWith('..') &&
+      /[./]/.test(file) &&
+      !isIgnoredPath(file)
+    ) {
       files.add(file);
     }
   }

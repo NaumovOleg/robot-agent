@@ -75,6 +75,22 @@ describe('dispatchHint', () => {
     expect(await read('sw.ts')).toContain('return c;');
   });
 
+  it('insert_text after a line end adds a newline so statements do not glue', async () => {
+    await fs.writeFile(path.join(dir, 'bar.ts'), "export * from './ctx';\nexport * from './provider';\n");
+    // model forgot the leading newline in newContent
+    await dispatchHint(
+      hint({
+        op: 'insert_text', file: 'bar.ts',
+        anchor: "export * from './provider';", insertMode: 'after',
+        newContent: "export * from './faq';",
+      }),
+      dir
+    );
+    const out = await read('bar.ts');
+    expect(out).not.toContain("provider';export");
+    expect(out).toContain("export * from './provider';\nexport * from './faq';");
+  });
+
   it('insert_text matches a single-line anchor against a multi-line import', async () => {
     await fs.writeFile(path.join(dir, 'imp.ts'), 'import {\n  A,\n  B,\n} from "./x";\n');
     await dispatchHint(
@@ -168,6 +184,12 @@ describe('dispatchHint', () => {
   it('rename_file moves the file', async () => {
     await dispatchHint(hint({ op: 'rename_file', file: 'a.ts', target: 'b.ts' }), dir);
     expect(await read('b.ts')).toContain('greet');
+  });
+
+  it('refuses to write to a generated/vendor path (dist)', async () => {
+    await expect(
+      dispatchHint(hint({ op: 'create_file', file: 'dist/x.ts', newContent: 'export const x = 1;' }), dir)
+    ).rejects.toThrow(/generated|build output|dist/i);
   });
 
   it('rejects path traversal', async () => {

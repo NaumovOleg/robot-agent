@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { isIgnoredPath } from './ignorePaths';
 
 const MAX_REFERENCE_CHARS = 6_000;
 
@@ -18,7 +19,7 @@ export const findReferenceFile = async (
   const targetDir = path.dirname(targetRelPath);
 
   const searchDirs = [targetDir, path.dirname(targetDir)].filter(
-    (d, i, arr) => d !== '.' && arr.indexOf(d) === i
+    (d, i, arr) => d !== '.' && arr.indexOf(d) === i && !isIgnoredPath(d)
   );
 
   for (const relDir of searchDirs) {
@@ -26,7 +27,8 @@ export const findReferenceFile = async (
     const entries = await fs.readdir(absDir, { withFileTypes: true }).catch(() => []);
     const candidates = entries
       .filter((e) => e.isFile() && e.name !== targetBase && path.extname(e.name) === ext)
-      .map((e) => path.join(relDir, e.name));
+      .map((e) => path.join(relDir, e.name))
+      .filter((rel) => !isIgnoredPath(rel));
 
     let best: { file: string; content: string } | null = null;
     for (const rel of candidates) {
