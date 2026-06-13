@@ -40,6 +40,24 @@ describe('dispatchHint', () => {
     ).rejects.toThrow(/Target not found/);
   });
 
+  it('tolerates a leaked line-number prefix in a text anchor', async () => {
+    // The mini-reader sees "2 |   return "hi";" and sometimes copies "2 " into the
+    // anchor. The stripped form must still match.
+    await dispatchHint(
+      hint({ op: 'replace_text', file: 'a.ts', anchor: '2   return "hi";', newContent: '  return "yo";' }),
+      dir
+    );
+    expect(await read('a.ts')).toContain('return "yo";');
+  });
+
+  it('tolerates a "N | " line-number prefix in a text anchor', async () => {
+    await dispatchHint(
+      hint({ op: 'insert_text', file: 'a.ts', anchor: '1 | export const greet = () => {', insertMode: 'after', newContent: '\n  // hi' }),
+      dir
+    );
+    expect(await read('a.ts')).toContain('{\n  // hi');
+  });
+
   it('replace_text is a no-op when the change is already applied (idempotent)', async () => {
     // Simulates a redundant rename hint: a prior rename_symbol already turned
     // <App /> into <Page />, so this replace_text anchor is gone but the new

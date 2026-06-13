@@ -38,6 +38,21 @@ const requireField = <T>(value: T | null | undefined, field: string, op: string)
   return value;
 };
 
+// The mini-reader sees files line-numbered ("8 | const x = 1;") and frequently
+// leaks that prefix into anchors ("8 const x = 1;" or "8 | const x = 1;") despite
+// the prompt. If the verbatim anchor doesn't match, retry with a leading
+// line-number artifact stripped — but only when the stripped form actually
+// matches, so legitimate anchors that begin with a number are never harmed.
+const LINE_NUMBER_PREFIX = /^\s*\d+\s*\|?\s+/;
+const resolveAnchor = (content: string, anchor: string): string => {
+  if (content.includes(anchor)) return anchor;
+  const stripped = anchor.replace(LINE_NUMBER_PREFIX, '');
+  if (stripped !== anchor && stripped.length > 0 && content.includes(stripped)) {
+    return stripped;
+  }
+  return anchor; // unchanged — let the underlying op throw a clear error
+};
+
 const astEditFromHint = (hint: ExecutorHint, action: AstEdit['action']): AstEdit => ({
   mode: 'ast',
   action,
@@ -110,7 +125,7 @@ export const dispatchHint = async (
   let next: string;
 
   if (op === 'replace_text') {
-    const anchor = requireField(hint.anchor, 'anchor', op);
+    const anchor = resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
     const replaceWith = requireField(hint.newContent, 'newContent', op);
     // Idempotency: if the old text is gone but the new text is already present, a
     // prior hint (e.g. a rename) already made this change — treat it as a no-op
@@ -135,7 +150,7 @@ export const dispatchHint = async (
     const anchor =
       insertMode === 'start' || insertMode === 'end'
         ? (hint.anchor ?? '')
-        : requireField(hint.anchor, 'anchor', op);
+        : resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
     next = applyTextInsert(content, {
       mode: 'text', action: 'insert', file: hint.file,
       anchor: { type: 'exact', value: anchor },
@@ -144,7 +159,7 @@ export const dispatchHint = async (
       reasoning: '',
     });
   } else if (op === 'remove_text') {
-    const anchor = requireField(hint.anchor, 'anchor', op);
+    const anchor = resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
     // Idempotency: nothing to remove if the text is already gone.
     if (!content.includes(anchor)) {
       return { file: hint.file, summary: `remove_text ${hint.file} (already removed)` };

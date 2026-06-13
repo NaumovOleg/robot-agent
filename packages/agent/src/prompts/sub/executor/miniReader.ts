@@ -80,6 +80,10 @@ ${fileBlocks || '(no existing files — this step creates new ones)'}
 ${retryBlock}
 
 ## Output rules
+- CRITICAL: the file content above is shown with "N | " line-number prefixes for
+  YOUR reference only. NEVER copy the "N | " (or the bare number) into an anchor.
+  The anchor must be the raw source text only. Wrong: "8 } from './x';". Right:
+  "} from './x';".
 - "anchor" must be a VERBATIM substring copied from the file content above (without the "N | " line-number prefix) and must occur exactly once in the file.
 - "newContent" is the complete replacement/insertion text — real code, correct indentation, no placeholders.
 - For create_file, "newContent" is the entire file content.
