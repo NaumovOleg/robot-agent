@@ -62,6 +62,10 @@ export const escalateNode = (state: ExecutorStateType) => {
       currentStepId: stepId,
       userGuidance: parsed.guidance,
       retryCounts: { [stepId]: 0 },
+      repairCount: 0,
+      // clear the prior verdict so a fresh mini_reader run isn't shadowed by a
+      // stale 'blocked' status (which would re-route straight back to escalate)
+      miniReaderStatus: null,
       stepStates: { [stepId]: 'running' as StepStatus },
     };
   }

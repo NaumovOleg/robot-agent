@@ -11,7 +11,8 @@ import { findReferenceFile } from './referenceFile';
 export const miniReaderNode = async (state: ExecutorStateType) => {
   const { plan, cwd, currentStepId } = state;
   const step = plan?.steps.find((s) => s.id === currentStepId);
-  if (!plan || !step) return { currentHints: [], lastError: 'mini_reader: no current step' };
+  if (!plan || !step)
+    return { currentHints: [], miniReaderStatus: null, lastError: 'mini_reader: no current step' };
 
   const targetFiles = step.files.slice(0, 15);
   if (targetFiles.length < step.files.length) {
@@ -30,6 +31,7 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   if (files.length === 0 && step.files.length > 0 && step.kind !== 'create') {
     return {
       currentHints: [],
+      miniReaderStatus: null,
       lastError: `mini_reader: file(s) not found for ${step.kind} step: ${step.files.join(', ')}`,
     };
   }
