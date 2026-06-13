@@ -101,18 +101,31 @@ The whitespace-tolerant *silent* apply in `resolveAnchor` is removed — fuzzy i
 
 After `apply` succeeds (all hints applied + tree-sitter syntax check passes) and before `verify_step`:
 
-- Detect the project formatter once (cache on state/context): prefer `prettier` (if in devDeps / config present), else `eslint --fix`, else none.
+- Detect the formatter **per language of the touched file**, not a single project-wide assumption:
+  - JS/TS/CSS/MD/JSON → `prettier` (if present) else `eslint --fix`.
+  - Go → `gofmt`/`goimports`; Rust → `rustfmt`; Python → `black`/`ruff format`; and similar native formatters keyed by language.
+  - Resolve the formatter only if it's actually available in the project (devDep / config / on PATH). Cache the per-language resolution.
 - Run it on the touched files only (`producedFiles` of this attempt), scoped to `cwd`.
-- Skip cleanly when no formatter is configured or the file's language isn't supported by the formatter. Formatter failure is non-fatal (log + continue) — it must never block a correct edit.
+- Skip cleanly when no formatter resolves for that language. Formatter failure is non-fatal (log + continue) — it must never block a correct edit.
 
-This normalizes the model's indentation/whitespace regardless of what it emitted, making strict matching safe to ship.
+This normalizes the model's indentation/whitespace regardless of what it emitted, making strict matching safe to ship — in any language, falling back to "no formatter" gracefully.
 
 ### 6. AST cleanup
 
 - Delete `packages/tools/src/utils/astEdit.ts` (`resolveAstEdit`, `findNodeBySymbol`) — dead duplicate finder.
 - `astOps.ts`: keep `findNode`, `applyAstReplace` (for `replace_node`), `applyAstRename` (for `rename_symbol`). Remove `applyAstInsert` and `applyAstRemove` (ops dropped).
-- **nodeType normalization** for `replace_node`: map common TS-compiler node names → tree-sitter grammar names (`VariableDeclaration`→`lexical_declaration`, `FunctionDeclaration`→`function_declaration`, `ClassDeclaration`→`class_declaration`, `InterfaceDeclaration`→`interface_declaration`, `TypeAliasDeclaration`→`type_alias_declaration`, `EnumDeclaration`→`enum_declaration`, …). Apply in `dispatch` before `findNode`. Unknown names pass through unchanged.
+- **nodeType normalization** for `replace_node`: map common compiler/casual node names → tree-sitter grammar names, **keyed by language**. The TS/JS map (`VariableDeclaration`→`lexical_declaration`, `FunctionDeclaration`→`function_declaration`, `ClassDeclaration`→`class_declaration`, `InterfaceDeclaration`→`interface_declaration`, `TypeAliasDeclaration`→`type_alias_declaration`, `EnumDeclaration`→`enum_declaration`, …) is the first entry; other languages can add their own without touching the dispatch logic. Apply in `dispatch` before `findNode`. Unknown names pass through unchanged so any valid native tree-sitter type still works.
 - **Unsupported-language guard**: `replace_node` / `rename_symbol` on a file whose language has no bundled wasm returns a clear error routed as `blocked` (escalate) rather than an uncaught throw. `edit_text` and file ops are pure text and work on any language.
+
+### 6a. Language-agnostic by design
+
+The executor must work across languages, not just TypeScript. The contract is built so the text path is the universal default and the AST path degrades gracefully:
+
+- `edit_text`, `create_file`, `delete_file`, `rename_file` are pure text — they work identically in any language.
+- `replace_node` / `rename_symbol` use the bundled tree-sitter wasm set (ts, tsx, js, python, go, rust, java, c, csharp, php, ruby, dart, json). For a language with no wasm they don't throw — they return the `blocked` guard so the step escalates or the model re-expresses the edit as `edit_text`.
+- `detectLanguage` currently advertises languages with no bundled wasm (`kotlin`, `cpp`, `swift`, `yaml`, `css`, `sql`, …). The guard (above) must treat "language detected but no wasm" the same as "unsupported" — never crash.
+- nodeType normalization and formatter resolution are both keyed by language, so adding a language is data, not control-flow.
+- The prompt must not assume TypeScript: examples stay language-neutral or are clearly marked as TS-specific, and the `replace_node` vocabulary note states it lists TS/JS node types as an example, with "use your language's tree-sitter node names" for others.
 
 ### 7. Prompt rework (`prompts/sub/executor/miniReader.ts`)
 
@@ -129,7 +142,8 @@ This normalizes the model's indentation/whitespace regardless of what it emitted
 - `packages/shared/src/utils/editor/astOps.ts` — remove `applyAstInsert`/`applyAstRemove`.
 - `packages/shared/src/utils/editor/textOps.ts` — `edit_text` strict matcher + rich errors.
 - `packages/tools/src/utils/astEdit.ts` — delete.
-- `packages/agent/src/prompts/sub/executor/miniReader.ts` — rewrite output rules.
+- `packages/agent/src/prompts/sub/executor/miniReader.ts` — rewrite output rules (language-neutral).
+- `packages/shared/src/ast/parser.ts` / `detectLanguage.ts` — expose "is this language backed by a bundled wasm?" so the guard and `checkSyntax` agree, and the AST ops can decline cleanly instead of throwing on `Language.load`.
 
 ## Risks
 
@@ -142,3 +156,4 @@ This normalizes the model's indentation/whitespace regardless of what it emitted
 - `pnpm build` (strict order) and `npx tsc --noEmit` per touched package.
 - Run executor against representative plans: a list/union add, a multi-line function-body rewrite, a new-file create mirroring a sibling, a cross-file type-error self-correction, and a step that's already satisfied (expect `noop`→done, not 4 retries).
 - Confirm formatter pass normalizes a deliberately mis-indented `newText`.
+- Run a non-TypeScript edit (e.g. a Python or Go file) end-to-end: `edit_text` applies, the language's formatter runs (or skips cleanly), and a `replace_node` on a no-wasm language degrades to `blocked` instead of crashing.
