@@ -4,24 +4,20 @@ export const resolveQuestion = (state: RootStateType): string => {
   const source = state.clarificationSource;
 
   if (source === 'router') {
-    return state.router?.intent?.question ?? 'Could you clarify your request?';
+    return state.router?.intent?.question?.trim() || 'Could you clarify your request?';
   }
 
-  //   if (source === 'planner') {
-  //     return (
-  //       state.plan?.clarification_question ?? 'Could you clarify the task before I start planning?'
-  //     );
-  //   }
+  if (source === 'planner') {
+    // plannerNode sets state.question to the first clarifying question; fall back
+    // to the plan's list, then a generic prompt.
+    return (
+      state.question?.trim() ||
+      state.plan?.clarifying_questions?.[0] ||
+      'Could you clarify the task before I start planning?'
+    );
+  }
 
-  //   if (source === 'executor') {
-  //     const failedStep = Object.entries(state.steps_state ?? {}).find(
-  //       ([, status]) => status === 'failed'
-  //     )?.[0];
-  //     const lastError = failedStep
-  //       ? (state.steps_results?.[failedStep] ?? 'unknown error')
-  //       : 'unknown error';
-  //     return `Step "${failedStep}" failed with: ${lastError}\nHow should I proceed?`;
-  //   }
-
-  return 'Could you provide more details?';
+  // Executor escalation emits its own agent:question from inside the subgraph and
+  // does not route through askUserNode, so it is not resolved here.
+  return state.question?.trim() || 'Could you provide more details?';
 };
