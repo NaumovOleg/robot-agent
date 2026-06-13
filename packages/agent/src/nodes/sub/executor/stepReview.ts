@@ -34,6 +34,9 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
   if (state.lastError) {
     status = 'insufficient';
     reason = state.lastError;
+  } else if (state.miniReaderStatus === 'noop') {
+    status = 'sufficient';
+    reason = 'Step already satisfied — no edit needed.';
   } else {
     status = 'sufficient';
     reason =
@@ -68,6 +71,8 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       verifyOutput: null,
       verifyPassed: null,
       errorFiles: [],
+      miniReaderStatus: null,
+      repairCount: 0,
     };
   }
 
@@ -84,6 +89,8 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       lastError: reason,
       currentHints: [],
       verifyPassed: null,
+      miniReaderStatus: null,
+      repairCount: 0,
     };
   }
 
@@ -102,5 +109,7 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     verifyOutput: null,
     verifyPassed: null,
     errorFiles: [],
+    miniReaderStatus: null,
+    repairCount: 0,
   };
 };

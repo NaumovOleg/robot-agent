@@ -12,6 +12,9 @@ import {
   escalateNode,
   finalizeNode,
   hasDestructiveHints,
+  validateNode,
+  repairNode,
+  formatNode,
 } from '../../nodes/sub/executor';
 import { traceExecutorNode } from '../../nodes/sub/executor/summary';
 import { ExecutorState } from './state';
@@ -32,15 +35,26 @@ const afterReaderStep = (state: ExecutorStateType): string =>
     : 'step_selector';
 
 const afterMiniReader = (state: ExecutorStateType): string => {
-  if (state.currentHints.length === 0) return 'step_review'; // failure path
-  return hasDestructiveHints(state) ? 'approval_gate' : 'apply';
+  if (state.miniReaderStatus === 'blocked') return 'escalate';
+  if (state.miniReaderStatus === 'noop' || state.currentHints.length === 0) return 'step_review';
+  return 'validate';
 };
+
+const afterValidate = (state: ExecutorStateType): string => {
+  if (state.hintErrors.length === 0) {
+    return hasDestructiveHints(state) ? 'approval_gate' : 'apply';
+  }
+  return 'repair';
+};
+
+const afterRepair = (state: ExecutorStateType): string =>
+  state.lastError ? 'step_review' : 'validate';
 
 const afterApprovalGate = (state: ExecutorStateType): string =>
   state.lastError ? 'step_review' : 'apply';
 
 const afterApply = (state: ExecutorStateType): string =>
-  state.lastError ? 'step_review' : 'verify_step';
+  state.lastError ? 'step_review' : 'format';
 
 const afterReview = (state: ExecutorStateType): string => {
   if (!state.currentStepId) return 'step_selector'; // done
@@ -66,6 +80,9 @@ export function createExecutorGraph(checkpointer?: BaseCheckpointSaver) {
     .addNode('step_selector', traceExecutorNode('step_selector', stepSelectorNode))
     .addNode('reader_step', traceExecutorNode('reader_step', readerStepNode))
     .addNode('mini_reader', traceExecutorNode('mini_reader', miniReaderNode))
+    .addNode('validate', traceExecutorNode('validate', validateNode))
+    .addNode('repair', traceExecutorNode('repair', repairNode))
+    .addNode('format', traceExecutorNode('format', formatNode))
     .addNode('approval_gate', traceExecutorNode('approval_gate', approvalGateNode))
     .addNode('apply', traceExecutorNode('apply', applyNode))
     .addNode('verify_step', traceExecutorNode('verify_step', verifyStepNode))
@@ -84,14 +101,21 @@ export function createExecutorGraph(checkpointer?: BaseCheckpointSaver) {
       escalate: 'escalate', step_selector: 'step_selector',
     })
     .addConditionalEdges('mini_reader', afterMiniReader, {
-      approval_gate: 'approval_gate', apply: 'apply', step_review: 'step_review',
+      validate: 'validate', escalate: 'escalate', step_review: 'step_review',
+    })
+    .addConditionalEdges('validate', afterValidate, {
+      approval_gate: 'approval_gate', apply: 'apply', repair: 'repair',
+    })
+    .addConditionalEdges('repair', afterRepair, {
+      validate: 'validate', step_review: 'step_review',
     })
     .addConditionalEdges('approval_gate', afterApprovalGate, {
       step_review: 'step_review', apply: 'apply',
     })
     .addConditionalEdges('apply', afterApply, {
-      step_review: 'step_review', verify_step: 'verify_step',
+      step_review: 'step_review', format: 'format',
     })
+    .addEdge('format', 'verify_step')
     .addEdge('verify_step', 'step_review')
     .addConditionalEdges('step_review', afterReview, {
       step_selector: 'step_selector', escalate: 'escalate', mini_reader: 'mini_reader',

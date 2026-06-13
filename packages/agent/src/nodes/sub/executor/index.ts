@@ -11,3 +11,6 @@ export * from './finalize';
 export * from './dispatch';
 export * from './snapshots';
 export * from './relatedTest';
+export * from './validate';
+export * from './repair';
+export * from './format';
