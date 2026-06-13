@@ -27,6 +27,39 @@ describe('ExecutorHintSchema extensions', () => {
     });
     expect(hint.insertMode).toBe('after');
   });
+
+  it('rejects insert_text before/after without anchor', () => {
+    expect(() =>
+      ExecutorHintSchema.parse({
+        op: 'insert_text',
+        file: 'src/a.ts',
+        insertMode: 'after',
+        newContent: 'const y = 2;',
+      })
+    ).toThrow(/anchor is required/i);
+  });
+
+  it('rejects rename_symbol when newSymbol equals symbol', () => {
+    expect(() =>
+      ExecutorHintSchema.parse({
+        op: 'rename_symbol',
+        file: 'src/a.ts',
+        symbol: 'App',
+        newSymbol: 'App',
+      })
+    ).toThrow(/must differ/i);
+  });
+
+  it('rejects path traversal in hint file path', () => {
+    expect(() =>
+      ExecutorHintSchema.parse({
+        op: 'replace_text',
+        file: '../escape.ts',
+        anchor: 'x',
+        newContent: 'y',
+      })
+    ).toThrow(/relative to the repository root/i);
+  });
 });
 
 describe('runCommand', () => {

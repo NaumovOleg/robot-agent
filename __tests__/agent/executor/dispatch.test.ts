@@ -75,6 +75,37 @@ describe('dispatchHint', () => {
     expect(await read('sw.ts')).toContain('return c;');
   });
 
+  it('does not use fuzzy fallback when it matches multiple locations', async () => {
+    await fs.writeFile(
+      path.join(dir, 'amb.ts'),
+      [
+        'switch (x) {',
+        '  case 1:',
+        '    return a;',
+        '}',
+        '',
+        'switch (y) {',
+        '  case 1:',
+        '    return b;',
+        '}',
+        '',
+      ].join('\n')
+    );
+
+    await expect(
+      dispatchHint(
+        hint({
+          op: 'replace_text',
+          file: 'amb.ts',
+          // Collapsed anchor can fuzzy-match both switch blocks.
+          anchor: 'switch ( case 1: return',
+          newContent: 'switch (x) { return c; }',
+        }),
+        dir
+      )
+    ).rejects.toThrow(/Target not found|Expected unique target/);
+  });
+
   it('insert_text after a line end adds a newline so statements do not glue', async () => {
     await fs.writeFile(path.join(dir, 'bar.ts'), "export * from './ctx';\nexport * from './provider';\n");
     // model forgot the leading newline in newContent

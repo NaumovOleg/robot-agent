@@ -33,7 +33,9 @@ function sanitizeReaderOutputCandidate(candidate: MaybeRecord): MaybeRecord {
     if (!Array.isArray(items)) return [];
     return items.filter((item) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
-      const file = extractFileFromLocation((item as MaybeRecord).location);
+      const location = (item as MaybeRecord).location;
+      if (location == null || location === '') return true;
+      const file = extractFileFromLocation(location);
       return !!file && analyzedSet.has(file);
     });
   };

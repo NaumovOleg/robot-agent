@@ -153,6 +153,38 @@ describe('reader schemas — contract robustness', () => {
     expect(parsed.functions).toEqual([]);
   });
 
+  it('coerces structured params/calls and accepts missing function signature/location', () => {
+    const parsed = ReaderOutputSchema.parse({
+      summary: 'Inspected app entrypoint and found relevant declaration.',
+      status: 'sufficient',
+      filesAnalyzed: ['src/app.tsx'],
+      functions: [
+        {
+          name: 'App',
+          params: [{ name: 'props' }, { text: 'ctx' }],
+          calls: [{ callee: { object: 'React', property: 'useMemo' } }, { name: 'render' }],
+          signature: null,
+          location: null,
+          extraFieldFromAst: true,
+        },
+      ],
+      key_findings: [
+        {
+          file: 'src/app.tsx',
+          lines: '12-14',
+          content: 'const App = () => {\n  return <Text />;\n}',
+          comment: 'Main entry component declaration.',
+        },
+      ],
+      potential_edit_strategy: null,
+    });
+
+    expect(parsed.functions[0]?.params).toEqual(['props', 'ctx']);
+    expect(parsed.functions[0]?.calls).toEqual(['React.useMemo', 'render']);
+    expect(parsed.functions[0]?.signature).toBeNull();
+    expect(parsed.functions[0]?.location).toBeNull();
+  });
+
   it('enforces ast analyzer symbolName rules', () => {
     expect(() =>
       AnalyzeAstToolSchema.parse({

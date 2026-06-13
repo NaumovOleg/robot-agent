@@ -158,7 +158,8 @@ ${retryBlock}
   YOUR reference only. NEVER copy the "N | " (or the bare number) into an anchor.
   The anchor must be the raw source text only. Wrong: "8 } from './x';". Right:
   "} from './x';".
-- "anchor" must be a VERBATIM substring copied from the file content above (without the "N | " line-number prefix) and must occur exactly once in the file.
+- "anchor" must be a VERBATIM substring copied from the file content above (without the "N | " prefix) and should occur exactly once in the file.
+- For insert_text with insertMode "start" or "end", set anchor to null (it is not used).
 - "newContent" is the complete replacement/insertion text — real code, correct indentation, no placeholders.
 - For create_file, "newContent" is the entire file content. Mirror the import,
   export, and style conventions of the existing/reference files shown above —
@@ -175,6 +176,8 @@ ${retryBlock}
   leaves other usages dangling and breaks the type check. "nodeType" is optional
   for rename_symbol and ignored.
 - Prefer replace_text with a tight unique anchor over AST ops, EXCEPT for renames.
+- For structural rewrites (switch/if blocks, function bodies, type aliases, enums),
+  prefer replace_node over large replace_text blocks when you can name the symbol/node.
 - MAKE THE SMALLEST EDIT THAT WORKS. Anchor only the few characters you actually
   change, not whole declarations or blocks. A larger anchor risks re-emitting
   surrounding code incorrectly.

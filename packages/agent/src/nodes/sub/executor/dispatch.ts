@@ -56,16 +56,23 @@ const LINE_NUMBER_PREFIX = /^\s*\d+\s*\|?\s+/;
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Whitespace-tolerant match: the model often reproduces an anchor with different
-// indentation or collapses a multi-line span (e.g. a multi-line import or a whole
-// switch block) onto fewer lines. Match the anchor's non-whitespace tokens against
-// the file allowing ANY whitespace between them, and return the file's ACTUAL span
-// so the edit applies verbatim. Returns null if there is no single such span.
+// indentation or collapses a multi-line span (e.g. a multi-line import) onto fewer
+// lines. Match anchor tokens against the file allowing ANY whitespace between them.
+// Safety rule: use fuzzy fallback ONLY when exactly one match exists; otherwise
+// return null and let the strict matcher fail with a clear error.
 const fuzzyWhitespaceAnchor = (content: string, anchor: string): string | null => {
   const tokens = anchor.trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return null;
-  const re = new RegExp(tokens.map(escapeRegExp).join('\\s+'));
-  const match = content.match(re);
-  return match ? match[0] : null;
+  const re = new RegExp(tokens.map(escapeRegExp).join('\\s+'), 'g');
+  const matches: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(content)) !== null) {
+    matches.push(match[0]);
+    // Guard against pathological zero-length loops.
+    if (match[0].length === 0) re.lastIndex += 1;
+    if (matches.length > 1) return null;
+  }
+  return matches[0] ?? null;
 };
 
 // Models frequently forget the newline when inserting a whole line/statement, so

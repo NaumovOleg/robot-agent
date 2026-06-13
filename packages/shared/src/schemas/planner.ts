@@ -50,7 +50,7 @@ export const PlanStepSchema = z.object({
     .default([])
     .describe(
       'Files this step will read or modify. ' +
-        'Must be relative paths. Empty only for bash-only steps.'
+        'Must be relative paths. Empty is allowed only for verification/orchestration steps that do not target a specific file.'
     ),
 
   depends_on: z
@@ -183,6 +183,27 @@ export const PlannerOutputSchema = z
 
   // ─── Cross-field validation ──────────────────────────────────────────────
   .superRefine((data, ctx) => {
+    const stepsById = new Map(data.steps.map((s, i) => [s.id, { step: s, index: i }]));
+    const adjacency = new Map<string, string[]>(
+      data.steps.map((s) => [s.id, [...s.depends_on]])
+    );
+
+    const hasPath = (from: string, to: string): boolean => {
+      if (from === to) return true;
+      const visited = new Set<string>();
+      const queue = [from];
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        for (const dep of adjacency.get(current) ?? []) {
+          if (dep === to) return true;
+          if (!visited.has(dep)) queue.push(dep);
+        }
+      }
+      return false;
+    };
+
     // 1. Step IDs must be unique
     const ids = data.steps.map((s) => s.id);
     const duplicateIds = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -198,11 +219,22 @@ export const PlannerOutputSchema = z
     const idSet = new Set(ids);
     data.steps.forEach((step, i) => {
       step.depends_on.forEach((depId) => {
-        if (!idSet.has(depId)) {
+        const dep = stepsById.get(depId);
+        if (!dep || !idSet.has(depId)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['steps', i, 'depends_on'],
             message: `Step "${step.id}" depends on unknown step "${depId}".`,
+          });
+          return;
+        }
+
+        // depends_on must only point to earlier steps in the array (ordered DAG)
+        if (dep.index >= i) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['steps', i, 'depends_on'],
+            message: `Step "${step.id}" depends on "${depId}" which must appear earlier in steps.`,
           });
         }
         // No self-dependency
@@ -215,6 +247,25 @@ export const PlannerOutputSchema = z
         }
       });
     });
+
+    // 2b. No cycles (ordered check catches most; this guards malformed manual plans)
+    const visit = (id: string, stack: Set<string>, done: Set<string>): void => {
+      if (done.has(id)) return;
+      if (stack.has(id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['steps'],
+          message: `Cycle detected in depends_on graph at step "${id}".`,
+        });
+        return;
+      }
+      stack.add(id);
+      for (const dep of adjacency.get(id) ?? []) visit(dep, stack, done);
+      stack.delete(id);
+      done.add(id);
+    };
+    const done = new Set<string>();
+    for (const id of ids) visit(id, new Set<string>(), done);
 
     // 3. Every edit/create/delete step must depend on at least one inspect step
     //    that covers at least one of its files
@@ -237,14 +288,7 @@ export const PlannerOutputSchema = z
 
       const hasInspectDep = step.files.some((file) => {
         const inspectors = inspectCoverage.get(file) ?? new Set();
-        return [...inspectors].some(
-          (inspectId) =>
-            step.depends_on.includes(inspectId) ||
-            // transitive: step depends on something that depends on the inspect step
-            data.steps.some(
-              (s) => step.depends_on.includes(s.id) && s.depends_on.includes(inspectId)
-            )
-        );
+        return [...inspectors].some((inspectId) => hasPath(step.id, inspectId));
       });
 
       if (!hasInspectDep) {
@@ -258,16 +302,26 @@ export const PlannerOutputSchema = z
       }
     });
 
-    // 4. files_affected must equal union of non-inspect step files (soft check)
+    // 4. files_affected must equal union of non-inspect step files
     const nonInspectFiles = new Set(
       data.steps.filter((s) => s.kind !== 'inspect').flatMap((s) => s.files)
     );
+    const affectedSet = new Set(data.files_affected);
     nonInspectFiles.forEach((file) => {
-      if (!data.files_affected.includes(file)) {
+      if (!affectedSet.has(file)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['files_affected'],
           message: `File "${file}" appears in a non-inspect step but is missing from files_affected.`,
+        });
+      }
+    });
+    data.files_affected.forEach((file) => {
+      if (!nonInspectFiles.has(file)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['files_affected'],
+          message: `File "${file}" is listed in files_affected but not used by any non-inspect step.`,
         });
       }
     });

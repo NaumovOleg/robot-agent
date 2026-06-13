@@ -134,15 +134,12 @@ gitStep:
    - intent.scope=project_wide → plan.risk must be "high" or "medium"
    - intent.intent=delete → plan.risk must be "high"
 
-4. For run_command intent: produce a single bash step with the appropriate command.
-   No inspect or edit steps needed.
+4. For explain/code_search intents (if they reach planning), produce only inspect
+   steps. No edit, create, or delete steps.
 
-5. For explain/code_search intent: produce only inspect steps.
-   No edit, create, or delete steps.
-
-6. Keep the plan minimal. Do not add steps for things the user did not ask for.
+5. Keep the plan minimal. Do not add steps for things the user did not ask for.
    No speculative refactors, no "while we're at it" changes.
 
-7. Type-check constraint is always required for ${language.primary}:
+6. Type-check constraint is always required for ${language.primary}:
    "Run ${typeCheckCmd} after every file modification — fix all errors before proceeding."`;
 };

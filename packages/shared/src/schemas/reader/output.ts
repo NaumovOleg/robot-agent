@@ -31,18 +31,36 @@ const clipStr =
 // LLM/AST robustness: params & calls arrive as either plain strings or structured
 // objects ({ name }, { text }, { callee }, …). Coerce any element to its string
 // name and drop anything unrenderable, so a thin/odd shape never fails the parse.
+const extractName = (item: unknown): string | null => {
+  if (typeof item === 'string') {
+    const t = item.trim();
+    return t.length > 0 ? t : null;
+  }
+  if (!item || typeof item !== 'object') return null;
+  const o = item as Record<string, unknown>;
+  const direct = o.name ?? o.text ?? o.identifier ?? o.value;
+  if (typeof direct === 'string') {
+    const t = direct.trim();
+    if (t.length > 0) return t;
+  }
+  const callee = o.callee;
+  if (callee && typeof callee === 'object') {
+    const c = callee as Record<string, unknown>;
+    const composed = [c.object, c.property]
+      .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      .map((p) => p.trim())
+      .join('.');
+    if (composed.length > 0) return composed;
+    if (typeof c.name === 'string' && c.name.trim().length > 0) return c.name.trim();
+  }
+  if (typeof callee === 'string' && callee.trim().length > 0) return callee.trim();
+  return null;
+};
+
 const toNameArray = (v: unknown): unknown => {
   if (!Array.isArray(v)) return v == null ? [] : v;
   return v
-    .map((item) => {
-      if (typeof item === 'string') return item.trim();
-      if (item && typeof item === 'object') {
-        const o = item as Record<string, unknown>;
-        const name = o.name ?? o.text ?? o.callee ?? o.identifier ?? o.value;
-        return typeof name === 'string' ? name.trim() : null;
-      }
-      return null;
-    })
+    .map(extractName)
     .filter((s): s is string => typeof s === 'string' && s.length > 0);
 };
 

@@ -74,10 +74,10 @@ ${instructions ? `## Additional instructions\n${instructions}` : ''}
 
 When populating the finalizer output, target these fields precisely:
 
-- **functions[].bodyPreview**: Copy the **first 1–5 lines only** of the function body verbatim from the file — stop after line 5, never include the full body of long functions. Required when status is \`sufficient\`.
+- **functions[].bodyPreview**: Best-effort only. If available, copy the **first 1–5 lines** of the function body verbatim from the file (never include long full bodies).
 - **functions[].calls**: List the function/hook names called inside the function body. Include only names observed in the source — no inference.
 - **functions[].nodeType / parentNodeType**: Copy exactly from ast_analyzer output.
-- **classes[].location**: Must include file path and line number (e.g., \`src/foo.ts:42\`).
+- **classes[].location**: Include file path and line number when available (e.g., \`src/foo.ts:42\`).
 - **imports[].specifiers**: List exact identifiers as they appear in source.
 - **key_findings[].content**: Verbatim source snippet. Preserve original formatting and indentation.
 - **operation_hints[].anchor**: For \`replace_text\`/\`remove_text\`: required — a single stable line copied verbatim from the file, unique in the file, no newlines, max ~250 chars. For \`insert_text\`: provide an anchor when inserting before/after a specific line; set null only when appending to the very end of the file.
