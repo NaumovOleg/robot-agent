@@ -49,7 +49,10 @@ export const escalateNode = (state: ExecutorStateType) => {
   EventBus.emit('agent:question', { sessionId, question, source: 'executor' });
   const answer: string = interrupt(question);
   const parsed = parseEscalationAnswer(answer);
-  EventBus.emit('agent:answer', { sessionId, answer, source: 'executor' });
+  // NOTE: do NOT emit 'agent:answer' here. That event's only listener is
+  // RoboAgent.answerQuestion → rootGraph.invoke(Command({resume})). Emitting it
+  // after interrupt() returns (i.e. mid-resume) would re-trigger a second resume
+  // on the live _main thread. The answer is already audited in answerQuestion.
   debug('[executor/escalate]', stepId, '→', parsed.decision);
 
   if (parsed.decision === 'retry' && step) {

@@ -8,7 +8,7 @@
 // recursionLimit: 100 passed on all invoke() calls — the default (25) is sufficient
 // for these test cases but 100 is passed preemptively per plan guidance.
 import { jest } from '@jest/globals';
-import { GraphValueError } from '@langchain/langgraph';
+import { GraphValueError, MemorySaver, Command } from '@langchain/langgraph';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -110,6 +110,36 @@ describe('executor graph (mocked LLM)', () => {
     ).rejects.toBeInstanceOf(GraphValueError);
 
     // every failed attempt was rolled back — file is pristine
+    expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toBe('export const a = 1;\n');
+  });
+
+  it('escalation interrupt pauses, then resumes via Command({resume}) to completion', async () => {
+    // 3 failing attempts → exhausted retries → escalate interrupt.
+    for (let i = 0; i < 3; i++) {
+      llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
+    }
+
+    // Compile WITH a checkpointer so the escalate interrupt pauses (instead of
+    // throwing) and can be resumed — exercising the same interrupt/resume path
+    // the root graph drives in production.
+    const graph = createExecutorGraph(new MemorySaver());
+    const config = { configurable: { thread_id: 't-escalate' }, recursionLimit: 100 };
+    const input = {
+      plan: plan([
+        { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'x' },
+      ]),
+      context: null, cwd: dir, sessionId: 's',
+    };
+
+    // First invoke runs until the escalate interrupt and pauses.
+    const paused = await graph.invoke(input, config);
+    expect(paused.__interrupt__).toBeDefined();
+    // file rolled back to pristine before the pause
+    expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toBe('export const a = 1;\n');
+
+    // Resume with "skip": the loop finishes cleanly, no throw, results recorded.
+    const final = await graph.invoke(new Command({ resume: 'skip' }), config);
+    expect(final.stepResults.some((r: { stepId: string }) => r.stepId === 'edit-a')).toBe(true);
     expect(await fs.readFile(path.join(dir, 'src/a.ts'), 'utf-8')).toBe('export const a = 1;\n');
   });
 });

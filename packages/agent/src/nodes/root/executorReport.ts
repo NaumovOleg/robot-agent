@@ -3,9 +3,11 @@ import type { RootStateType } from '@robocode-packages/shared';
 import { dedupeStepResults } from '../sub/executor';
 
 // Converts executor results into a SystemMessage so the final agent node can
-// compose the user-facing answer without knowing executor internals. Using a
-// SystemMessage (not HumanMessage) keeps this internal instruction out of the
-// user-visible, persisted conversation history.
+// compose the user-facing answer without knowing executor internals. A
+// SystemMessage (rather than HumanMessage) keeps it out of the tool/AI chain the
+// model treats as turns; like the context system prompt it is still persisted
+// and rendered as a system notice on reload — acceptable, and consistent with
+// the existing system-message handling.
 export const executorReportNode = (state: RootStateType) => {
   const { stepResults, plan } = state;
   if (!plan || stepResults.length === 0) return {};

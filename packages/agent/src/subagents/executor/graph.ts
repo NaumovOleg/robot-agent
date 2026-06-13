@@ -1,4 +1,5 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
+import type { BaseCheckpointSaver } from '@langchain/langgraph';
 import {
   initNode,
   stepSelectorNode,
@@ -54,7 +55,11 @@ const afterEscalate = (state: ExecutorStateType): string => {
   return step?.kind === 'inspect' ? 'reader_step' : 'mini_reader';
 };
 
-export function createExecutorGraph() {
+// `checkpointer` is only for isolated testing of interrupt/resume. In production
+// the executor runs as a subgraph-node with no checkpointer of its own and
+// inherits the root graph's checkpointer (which is what propagates interrupts to
+// the root thread). Passing one here would give it a separate persistence scope.
+export function createExecutorGraph(checkpointer?: BaseCheckpointSaver) {
   const graph = new StateGraph(ExecutorState)
     .addNode('init', initNode)
     .addNode('step_selector', stepSelectorNode)
@@ -96,10 +101,8 @@ export function createExecutorGraph() {
     })
     .addEdge('finalize', END);
 
-  // No checkpointer here: as a subgraph-node the parent's checkpointer is inherited,
-  // which is what makes interrupt()/resume work through the root thread.
   // NOTE: when invoked from the root graph, pass recursionLimit >= 75 — a multi-step plan with retries exceeds LangGraph's default of 25.
-  return graph.compile();
+  return graph.compile(checkpointer ? { checkpointer } : undefined);
 }
 
 export const executorGraph = createExecutorGraph();
