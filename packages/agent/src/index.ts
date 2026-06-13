@@ -23,6 +23,14 @@ class RoboAgent {
     return `${sessionId ?? this.session?.id ?? ''}_main`;
   }
 
+  // Prune the thread's checkpoints once a run has fully completed (no pending
+  // interrupt), keeping the SQLite file bounded. Skipped mid-interrupt so the
+  // resume checkpoint survives.
+  private maybePruneThread(threadId: string, result: unknown): void {
+    const interrupted = !!(result as { __interrupt__?: unknown })?.__interrupt__;
+    if (!interrupted) Checkpointer.pruneThread(threadId);
+  }
+
   // Resolves the session for a resume/answer. Falls back to the in-memory active
   // session when the on-disk index lookup misses — during a live run (e.g. an
   // executor escalation interrupt) the session is held in memory and may not be
@@ -180,6 +188,7 @@ class RoboAgent {
       AuditService.append(sessionId, 'agent:run', { input: userRequest });
 
       const result = await rootGraph.invoke({ messages: [], sessionId, cwd, userRequest }, config);
+      this.maybePruneThread(config.configurable.thread_id, result);
 
       const diffPromise = this.publishGitDiff(sessionId, cwd);
       try {
@@ -208,6 +217,7 @@ class RoboAgent {
 
     const historyBefore = MessageService.load(sessionId);
     const result = await rootGraph.invoke(new Command({ resume: decision }), config);
+    this.maybePruneThread(config.configurable.thread_id, result);
 
     const resultMessages: BaseMessage[] = result.messages ?? [];
     const newMessages = extractNewMessages(historyBefore, resultMessages);
@@ -231,6 +241,7 @@ class RoboAgent {
 
     const historyBefore = MessageService.load(sessionId);
     const result = await rootGraph.invoke(new Command({ resume: answer }), config);
+    this.maybePruneThread(config.configurable.thread_id, result);
 
     const diffPromise = this.publishGitDiff(sessionId, session.cwd);
     try {
