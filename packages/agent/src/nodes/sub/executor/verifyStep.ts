@@ -35,12 +35,16 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
   if (verifyCommands.typeCheck && isLastMutation(state)) {
     ranAnyCheck = true;
     const result = await runCommand(verifyCommands.typeCheck, cwd);
-    // Ignore errors in generated/vendor output (dist, node_modules, …): the loop
-    // edits source, not build artifacts, so it could never fix those anyway.
+    // Only count errors the loop can actually act on: in files UNDER the working
+    // directory, and not generated/vendor output. A monorepo type-check reaches
+    // sibling packages via path aliases ("../../packages/…"); errors there are
+    // outside this run's scope (and unfixable from here), so they must not block.
     const introduced = newVerifyErrors(parseVerifyErrors(result.output), baselineErrors).filter(
       (sig) => {
         const file = sig.split('|')[0]?.trim();
-        return !(file && file !== sig && isIgnoredPath(file));
+        if (!file || file === sig) return true; // positionless — keep
+        if (file.startsWith('..') || file.startsWith('/')) return false; // outside cwd
+        return !isIgnoredPath(file);
       }
     );
     const failed = introduced.length > 0;

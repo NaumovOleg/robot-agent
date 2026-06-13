@@ -44,6 +44,6 @@ describe('summarizeState', () => {
     expect(line).toContain('current=edit-a');
     expect(line).toContain('inspect-a:done');
     expect(line).toContain('edit-a:running');
-    expect(line).toContain('retries={edit-a=1}');
+    expect(line).toContain('edit-a=1');
   });
 });

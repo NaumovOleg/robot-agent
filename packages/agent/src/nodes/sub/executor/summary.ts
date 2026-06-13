@@ -44,7 +44,24 @@ export const summarizeState = (state: ExecutorStateType): string => {
     .filter(([, n]) => n > 0)
     .map(([id, n]) => `${id}=${n}`)
     .join(', ');
-  return `current=${state.currentStepId ?? '—'} | steps={${states}}${retries ? ` | retries={${retries}}` : ''}`;
+  const clip = (s: string, n = 140) => {
+    const one = s.replace(/\s+/g, ' ').trim();
+    return one.length > n ? one.slice(0, n) + '…' : one;
+  };
+
+  const lines = [`current=${state.currentStepId ?? '—'} | steps={${states}}`];
+  if (retries) lines.push(`  retries: ${retries}`);
+  if (state.currentHints?.length) {
+    lines.push(`  hints: ${state.currentHints.map((h) => `${h.op} ${h.file}`).join(', ')}`);
+  }
+  lines.push(
+    `  verify: ${state.verifyPassed === true ? 'passed' : state.verifyPassed === false ? 'FAILED' : '—'}` +
+      (state.errorFiles?.length ? ` | errorFiles: ${state.errorFiles.join(', ')}` : '') +
+      (state.producedFiles?.length ? ` | produced: ${state.producedFiles.join(', ')}` : '')
+  );
+  if (state.lastError) lines.push(`  lastError: ${clip(state.lastError)}`);
+  if (state.escalationDecision) lines.push(`  escalation: ${state.escalationDecision}`);
+  return lines.join('\n');
 };
 
 // Wraps an executor graph node so every entry logs the node name and the live
