@@ -235,14 +235,24 @@ const TextRemoveEditSchema = BaseEditSchema.extend({
   mode: z.literal('text'),
   action: z.literal('remove'),
   anchor: AnchorSchema.describe('Required for text/remove. Use a single stable anchor line.'),
-  target: SourceCodeSchema.describe(
-    'Required for text/remove. Exact verbatim code block to remove, copied from file.'
-  ),
+  target: SourceCodeSchema.nullable()
+    .default(null)
+    .describe(
+      'Optional for text/remove. Exact verbatim code block to remove when known; null means remove anchor.value.'
+    ),
   reasoning: ShortReasoningSchema.describe(
     'Why this specific edit is needed. Name the symbol, line, or finding that motivates it.'
   ),
-}).strict();
-// Note: target/anchor alignment is not enforced — executor uses target as old_str directly
+})
+  .strict()
+  .transform((data) => {
+    // When target does not include anchor, runtime would reject; normalize to null
+    // so executor safely falls back to anchor.value.
+    if (data.target != null && !data.target.includes(data.anchor.value)) {
+      return { ...data, target: null };
+    }
+    return data;
+  });
 
 export const TextEditSchema = z.union([
   TextReplaceEditSchema,
@@ -464,11 +474,13 @@ export const IntentSchema = z
   .object({
     edits: z
       .array(EditSchema)
+      .max(80)
       .describe(
         'Ordered edit operations. Use an empty array only when evidence is insufficient for safe required edits.'
       ),
     verification: z
       .array(ShortVerificationStepSchema)
+      .max(12)
       .default([])
       .describe('Post-edit validation steps. 1-4 steps when edits exist; [] when no edits.'),
     confidence: z

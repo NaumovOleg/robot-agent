@@ -18,7 +18,7 @@ export interface TextInsertEdit extends FileLocation {
   mode: 'text';
   action: 'insert';
   id?: string | null;
-  anchor: TextAnchor;
+  anchor: TextAnchor | null;
   insertMode: 'before' | 'after' | 'start' | 'end';
   insertText: string;
   reasoning: string;
@@ -29,7 +29,7 @@ export interface TextDeleteEdit extends FileLocation {
   action: 'remove';
   id?: string | null;
   anchor: TextAnchor;
-  target: string;
+  target?: string | null;
   reasoning: string;
 }
 

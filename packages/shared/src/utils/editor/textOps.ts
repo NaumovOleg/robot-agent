@@ -63,6 +63,9 @@ export const applyTextInsert = (content: string, edit: TextInsertEdit): string =
 
   if (insertMode === 'start') return insertText + content;
   if (insertMode === 'end') return content + insertText;
+  if (!anchor) {
+    throw new Error('[text/insert] anchor is required for insertMode "before" and "after"');
+  }
 
   const range = resolveMatch(content, anchor.value, 'text/insert', anchor);
 
