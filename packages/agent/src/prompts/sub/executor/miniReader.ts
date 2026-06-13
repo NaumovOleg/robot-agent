@@ -85,6 +85,12 @@ ${retryBlock}
 - For create_file, "newContent" is the entire file content.
 - For insert_text, set "insertMode" (before|after|start|end); the default is "after".
 - For rename_file, set "target" to the new repo-relative path.
-- Prefer replace_text with a tight unique anchor over AST ops unless renaming a symbol.
+- To rename a symbol (a variable/function/component and ALL its usages in a file),
+  emit ONE rename_symbol hint with "symbol" and "newSymbol". It renames every
+  occurrence in the file at once. Do NOT also add replace_text hints for the same
+  rename, and do NOT use replace_text to rename one occurrence at a time — that
+  leaves other usages dangling and breaks the type check. "nodeType" is optional
+  for rename_symbol and ignored.
+- Prefer replace_text with a tight unique anchor over AST ops, EXCEPT for renames.
 - Do not touch files outside the step's scope unless strictly required by the expected output.`;
 };

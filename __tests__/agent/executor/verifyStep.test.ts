@@ -3,7 +3,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { verifyStepNode } from '../../../packages/agent/src/nodes/sub/executor/verifyStep';
 
-const mkState = (cwd: string, verifyCommands: Record<string, string | null>, files = ['src/a.ts']) =>
+const mkState = (
+  cwd: string,
+  verifyCommands: Record<string, string | null>,
+  files = ['src/a.ts'],
+  baselineErrors: string[] = []
+) =>
   ({
     plan: {
       goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
@@ -13,7 +18,7 @@ const mkState = (cwd: string, verifyCommands: Record<string, string | null>, fil
     context: null, cwd, sessionId: 's', stepResults: [], stepStates: {},
     currentStepId: 'edit-a', currentHints: [], readerFindings: {}, fileSnapshots: {},
     retryCounts: {}, appliedOps: {}, lastError: null, userGuidance: null,
-    verifyOutput: null, escalationDecision: null,
+    verifyOutput: null, escalationDecision: null, baselineErrors,
     verifyCommands: { typeCheck: null, testRunner: null, lint: null, ...verifyCommands },
   }) as never;
 
@@ -37,6 +42,25 @@ describe('verifyStepNode', () => {
     );
     expect(res.lastError).toMatch(/Type check failed/);
     expect(res.verifyOutput).toContain('TS2304');
+  });
+
+  it('passes when the only type errors are pre-existing (in the baseline)', async () => {
+    // tsc reports a baseline error every run; the step introduced nothing new.
+    const cmd = 'node -e "console.error(\'foo.ts(1,1): error TS2304: pre-existing\'); process.exit(1)"';
+    const res = await verifyStepNode(
+      mkState(dir, { typeCheck: cmd }, ['src/a.ts'], ['foo.ts|error TS2304: pre-existing'])
+    );
+    expect(res.lastError).toBeNull();
+  });
+
+  it('fails only on errors not present in the baseline', async () => {
+    const cmd =
+      'node -e "console.error(\'foo.ts(1,1): error TS2304: pre-existing\'); console.error(\'src/a.ts(3,3): error TS2345: new break\'); process.exit(1)"';
+    const res = await verifyStepNode(
+      mkState(dir, { typeCheck: cmd }, ['src/a.ts'], ['foo.ts|error TS2304: pre-existing'])
+    );
+    expect(res.lastError).toMatch(/TS2345: new break/);
+    expect(res.lastError).not.toMatch(/pre-existing/);
   });
 
   it('runs related test file when testRunner configured and test exists', async () => {

@@ -47,6 +47,10 @@ export const ExecutorState = Annotation.Root({
     default: () => ({ typeCheck: null, testRunner: null, lint: null }),
   }),
   verifyOutput: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  // Normalized type-check error signatures captured at init, before any edit.
+  // verify_step subtracts these so a step is only blamed for NEW errors it
+  // introduced — not pre-existing project tsc noise (test files, etc.).
+  baselineErrors: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
   escalationDecision: Annotation<EscalationDecision | null>({ reducer: (_, n) => n, default: () => null }),
 });
 

@@ -1,6 +1,7 @@
-import { debug } from '@robocode-packages/shared';
+import { debug, runCommand } from '@robocode-packages/shared';
 import type { StepStatus } from '@robocode-packages/shared';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
+import { parseTscErrors } from './tscErrors';
 
 const hasCycle = (steps: { id: string; depends_on: string[] }[]): boolean => {
   const visiting = new Set<string>();
@@ -42,6 +43,17 @@ export const initNode = async (state: ExecutorStateType) => {
     lint: context?.language?.linter ?? null,
   };
 
+  // Capture the project's pre-existing type-check errors ONCE, before any edit.
+  // verify_step diffs against this so a step is only blamed for errors it newly
+  // introduces — a project that already has tsc noise (e.g. test files without
+  // jest types) would otherwise fail every single edit step forever.
+  let baselineErrors: string[] = [];
+  if (verifyCommands.typeCheck) {
+    const baseline = await runCommand(verifyCommands.typeCheck, state.cwd);
+    baselineErrors = parseTscErrors(baseline.output);
+    debug('[executor/init]', baselineErrors.length, 'baseline type-check errors');
+  }
+
   debug('[executor/init]', plan.steps.length, 'steps; verify:', verifyCommands);
-  return { stepStates, verifyCommands, lastError: null };
+  return { stepStates, verifyCommands, baselineErrors, lastError: null };
 };
