@@ -25,6 +25,25 @@ describe('buildMiniReaderPrompt', () => {
     expect(prompt).not.toContain('PREVIOUS ATTEMPT FAILED');
   });
 
+  it('lists files produced by earlier steps with their exact paths', () => {
+    const prompt = buildMiniReaderPrompt({
+      step, goal: 'g', constraints: [], files: [], findings: [],
+      producedFiles: ['src/screens/faq/FAQ.tsx'],
+      lastError: null, userGuidance: null, appliedOps: [],
+    });
+    expect(prompt).toContain('Files created or changed by EARLIER steps');
+    expect(prompt).toContain('src/screens/faq/FAQ.tsx');
+  });
+
+  it('omits the produced-files section when none exist', () => {
+    const prompt = buildMiniReaderPrompt({
+      step, goal: 'g', constraints: [], files: [], findings: [],
+      producedFiles: [],
+      lastError: null, userGuidance: null, appliedOps: [],
+    });
+    expect(prompt).not.toContain('Files created or changed by EARLIER steps');
+  });
+
   it('includes retry context when lastError is present', () => {
     const prompt = buildMiniReaderPrompt({
       step, goal: 'g', constraints: [], files: [], findings: [],

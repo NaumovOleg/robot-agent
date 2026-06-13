@@ -37,12 +37,18 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     .map((depId) => state.readerFindings[depId])
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
 
+  // Files created/changed by EARLIER steps in this plan, excluding the ones this
+  // step already reads — so the LLM references new files by their exact path.
+  const ownFiles = new Set(step.files);
+  const producedFiles = (state.producedFiles ?? []).filter((f) => !ownFiles.has(f));
+
   const prompt = buildMiniReaderPrompt({
     step,
     goal: plan.goal,
     constraints: plan.constraints,
     files,
     findings,
+    producedFiles,
     lastError: state.lastError,
     userGuidance: state.userGuidance,
     appliedOps: state.appliedOps[step.id] ?? [],

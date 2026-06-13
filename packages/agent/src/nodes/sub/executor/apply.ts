@@ -34,11 +34,13 @@ export const applyNode = async (state: ExecutorStateType) => {
       };
 
   const applied: string[] = [];
+  const touched: string[] = [];
   for (let i = 0; i < currentHints.length; i++) {
     const hint = currentHints[i];
     try {
       const result = await dispatchHint(hint, cwd);
       applied.push(result.summary);
+      touched.push(result.file);
       EventBus.emit('executor:edit:applied', {
         sessionId,
         stepId: currentStepId,
@@ -68,5 +70,10 @@ export const applyNode = async (state: ExecutorStateType) => {
     `applied ${applied.length} op(s):`,
     applied.map((s) => `\n    ✓ ${s}`).join('')
   );
-  return { fileSnapshots, appliedOps: { [currentStepId]: applied }, lastError: null };
+  return {
+    fileSnapshots,
+    appliedOps: { [currentStepId]: applied },
+    producedFiles: touched,
+    lastError: null,
+  };
 };

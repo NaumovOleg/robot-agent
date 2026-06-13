@@ -40,6 +40,13 @@ export const ExecutorState = Annotation.Root({
   retryCounts: Annotation<Record<string, number>>(mergeRecord<number>()),
   // applyNode replaces this per attempt; the previous attempt's ops are discarded with the rollback
   appliedOps: Annotation<Record<string, string[]>>(mergeRecord<string[]>()),
+  // Repo-relative paths created/modified by completed steps in this run. Fed to
+  // the mini-reader so a later edit step references newly-created files by their
+  // EXACT path instead of guessing (e.g. `./faq` vs `./faq/FAQ`).
+  producedFiles: Annotation<string[]>({
+    reducer: (prev, next) => [...new Set([...prev, ...next])],
+    default: () => [],
+  }),
   lastError: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   userGuidance: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   verifyCommands: Annotation<VerifyCommands>({

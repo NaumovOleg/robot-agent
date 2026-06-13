@@ -9,6 +9,8 @@ export interface MiniReaderPromptInput {
   files: { file: string; content: string }[];
   // operationHints from digests are intentionally not rendered — summary+keyFindings carry the prompt signal
   findings: ReaderDigest[];
+  // Repo-relative paths created/changed by earlier steps in this plan.
+  producedFiles?: string[];
   lastError: string | null;
   userGuidance: string | null;
   appliedOps: string[];
@@ -23,7 +25,8 @@ export const withLineNumbers = (content: string): string =>
     .join('\n');
 
 export const buildMiniReaderPrompt = (input: MiniReaderPromptInput): string => {
-  const { step, goal, constraints, files, findings, lastError, userGuidance, appliedOps } = input;
+  const { step, goal, constraints, files, findings, producedFiles, lastError, userGuidance, appliedOps } =
+    input;
 
   const fileBlocks = files
     .map(({ file, content }) => {
@@ -74,7 +77,16 @@ ${constraints.map((c) => `- ${c}`).join('\n') || '- none'}
 
 ## Investigation findings (from inspect steps)
 ${findingBlocks || '(none)'}
-
+${
+  producedFiles && producedFiles.length > 0
+    ? `
+## Files created or changed by EARLIER steps in this plan (they exist on disk NOW)
+When importing, exporting, or referencing these, use their EXACT path — do NOT
+guess a different name or assume an index barrel exists.
+${producedFiles.map((f) => `- ${f}`).join('\n')}
+`
+    : ''
+}
 ## Current file contents (fresh from disk, line-numbered)
 ${fileBlocks || '(no existing files — this step creates new ones)'}
 ${retryBlock}
