@@ -68,8 +68,15 @@ goal:
   Example: "Add a POST /auth/refresh endpoint to TokenService that rotates the refresh token on each use."
 
 clarifying_questions:
-  Array of questions when the task is ambiguous about WHAT to change (not HOW).
-  Empty array [] when the task is clear enough to plan.
+  Array of questions ONLY when the task is genuinely ambiguous about WHAT to
+  change (not HOW). Default to [] — most tasks are clear enough to plan.
+  Do NOT ask about things you can decide yourself or discover by reading code:
+  exact file paths, naming conventions, casing, where a symbol lives, whether to
+  update references — just plan it. A direct request like "rename X to Y" or
+  "add a FAQ page" is NOT ambiguous; return [].
+  Ask only when a wrong guess would do real damage AND you cannot infer the
+  answer (e.g. two plausible modules own the same name, or the request names a
+  feature that doesn't exist).
   When non-empty: steps must still be populated with a best-effort plan.
   Keep questions specific: "Which module owns the refresh token logic?" not "Please clarify."
 
