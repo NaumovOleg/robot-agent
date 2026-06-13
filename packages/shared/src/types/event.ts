@@ -60,6 +60,11 @@ export interface AppEvents {
   'agent:compact_complete': { sessionId: string; originalCount: number };
   'agent:question': { sessionId: string; question: string; source: ClarificationSource | null };
   'agent:answer': { sessionId: string; answer: string; source: ClarificationSource | null };
+  // Emitted once interrupt() returns the answer (i.e. the question is resolved).
+  // The asking node re-emits agent:question when LangGraph re-runs it on resume,
+  // which would otherwise leave a stale pendingQuestion in the UI. The UI clears
+  // pendingQuestion on this. No resume listener — purely a UI signal.
+  'agent:question_answered': { sessionId: string; source: ClarificationSource | null };
 
   'executor:step:start': {
     sessionId: string;

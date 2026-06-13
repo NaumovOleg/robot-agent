@@ -205,6 +205,12 @@ export const ChatScreen: React.FC = () => {
         setIsLoading(false);
         setThinkingPhrase(null);
       }),
+      EventBus.on('agent:question_answered', ({ sessionId }) => {
+        if (sessionId !== id) return;
+        // The asking node re-emits agent:question on resume; this clears the
+        // stale prompt so a later message isn't mis-routed as an answer.
+        setPendingQuestion(null);
+      }),
       EventBus.on('executor:step:start', ({ sessionId, title, index, total }) => {
         if (sessionId !== id) return;
         setThinkingPhrase(`Step ${index}/${total}: ${title}`);

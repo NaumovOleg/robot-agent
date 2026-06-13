@@ -13,6 +13,10 @@ export const askUserNode = (state: RootStateType) => {
   EventBus.emit('agent:question', { sessionId, question, source: clarificationSource });
   const answer: string = interrupt(question);
 
+  // interrupt() has returned the answer — the question is resolved. Tell the UI
+  // to clear pendingQuestion (this node re-emitted agent:question above when
+  // LangGraph re-ran it on resume, which would otherwise leave a stale prompt).
+  EventBus.emit('agent:question_answered', { sessionId, source: clarificationSource });
   debug('[askUserNode] resumed with answer:', answer);
   return { answer };
 };
