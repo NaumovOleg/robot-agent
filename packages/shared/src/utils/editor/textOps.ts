@@ -23,24 +23,33 @@ const collectMatches = (content: string, needle: string): TextRange[] => {
   return matches;
 };
 
+const clip = (s: string, n = 120): string => {
+  const one = s.replace(/\s+/g, ' ').trim();
+  return one.length > n ? one.slice(0, n) + '…' : one;
+};
+
 const resolveMatch = (content: string, needle: string, label: string, anchor?: TextAnchor): TextRange => {
   const matches = collectMatches(content, needle);
-  if (matches.length === 0) throw new Error(`[${label}] Target not found: "${needle}"`);
+  if (matches.length === 0) {
+    throw new Error(`[${label}] oldText not found in file: "${clip(needle)}"`);
+  }
 
   const matchMode = anchor?.match ?? 'unique';
   const occurrence = anchor?.occurrence ?? 1;
 
   if (matchMode === 'unique') {
     if (matches.length !== 1) {
-      throw new Error(`[${label}] Expected unique target but found ${matches.length} matches: "${needle}"`);
+      throw new Error(
+        `[${label}] oldText is not unique (${matches.length} matches): "${clip(needle)}". ` +
+          `Include more surrounding context so it matches exactly once.`
+      );
     }
-
     return matches[0];
   }
 
   const match = matches[occurrence - 1];
   if (!match) {
-    throw new Error(`[${label}] Occurrence ${occurrence} not found for target: "${needle}"`);
+    throw new Error(`[${label}] Occurrence ${occurrence} not found for oldText: "${clip(needle)}"`);
   }
 
   return match;
