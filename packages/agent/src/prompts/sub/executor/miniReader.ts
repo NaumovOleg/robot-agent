@@ -92,5 +92,13 @@ ${retryBlock}
   leaves other usages dangling and breaks the type check. "nodeType" is optional
   for rename_symbol and ignored.
 - Prefer replace_text with a tight unique anchor over AST ops, EXCEPT for renames.
+- MAKE THE SMALLEST EDIT THAT WORKS. Anchor only the few characters you actually
+  change, not whole declarations or blocks. A larger anchor risks re-emitting
+  surrounding code incorrectly.
+- When ADDING an item to an existing list, union, enum, object, or import, INSERT
+  just the new item — do NOT replace and re-type the whole declaration. Example:
+  to add 'faq' to \`type Route = 'a' | 'b';\`, use replace_text with anchor \`'b';\`
+  and newContent \`'b' | 'faq';\` (or insert_text). NEVER reproduce existing
+  members again — duplicating them causes "Duplicate identifier" type errors.
 - Do not touch files outside the step's scope unless strictly required by the expected output.`;
 };

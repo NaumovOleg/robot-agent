@@ -230,7 +230,10 @@ export const PlannerOutputSchema = z
     });
 
     data.steps.forEach((step, i) => {
-      if (step.kind === 'inspect' || step.files.length === 0) return;
+      // inspect: nothing to depend on. create: makes a NEW file — there is
+      // nothing to inspect, so requiring an inspect dependency is impossible.
+      // bash-only (no files): nothing to inspect either.
+      if (step.kind === 'inspect' || step.kind === 'create' || step.files.length === 0) return;
 
       const hasInspectDep = step.files.some((file) => {
         const inspectors = inspectCoverage.get(file) ?? new Set();
