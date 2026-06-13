@@ -42,6 +42,7 @@ export const stepSelectorNode = async (state: ExecutorStateType) => {
       stepStates: { [next.id]: 'running' as StepStatus },
       lastError: null,
       verifyOutput: null,
+      verifyPassed: null,
       currentHints: [],
     };
   }

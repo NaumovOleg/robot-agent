@@ -40,6 +40,19 @@ describe('dispatchHint', () => {
     ).rejects.toThrow(/Target not found/);
   });
 
+  it('replace_text is a no-op when the change is already applied (idempotent)', async () => {
+    // Simulates a redundant rename hint: a prior rename_symbol already turned
+    // <App /> into <Page />, so this replace_text anchor is gone but the new
+    // text is present. Must be a no-op, not a step failure.
+    await fs.writeFile(path.join(dir, 'a.tsx'), 'export const Root = () => <Page />;\n');
+    const res = await dispatchHint(
+      hint({ op: 'replace_text', file: 'a.tsx', anchor: '<App />', newContent: '<Page />' }),
+      dir
+    );
+    expect(res.summary).toMatch(/already applied/);
+    expect(await read('a.tsx')).toContain('<Page />');
+  });
+
   it('insert_text inserts after anchor', async () => {
     await dispatchHint(
       hint({

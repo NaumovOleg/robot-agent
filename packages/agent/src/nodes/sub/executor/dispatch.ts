@@ -111,10 +111,23 @@ export const dispatchHint = async (
 
   if (op === 'replace_text') {
     const anchor = requireField(hint.anchor, 'anchor', op);
+    const replaceWith = requireField(hint.newContent, 'newContent', op);
+    // Idempotency: if the old text is gone but the new text is already present, a
+    // prior hint (e.g. a rename) already made this change — treat it as a no-op
+    // instead of failing the step on "Target not found". The length guard avoids
+    // false positives where a short newContent is an incidental substring (e.g.
+    // "x" inside "export").
+    if (
+      replaceWith.length >= anchor.length &&
+      !content.includes(anchor) &&
+      content.includes(replaceWith)
+    ) {
+      return { file: hint.file, summary: `replace_text ${hint.file} (already applied)` };
+    }
     next = applyTextReplace(content, {
       mode: 'text', action: 'replace', file: hint.file,
       anchor: { type: 'exact', value: anchor },
-      replaceWith: requireField(hint.newContent, 'newContent', op),
+      replaceWith,
       reasoning: '',
     });
   } else if (op === 'insert_text') {
@@ -132,6 +145,10 @@ export const dispatchHint = async (
     });
   } else if (op === 'remove_text') {
     const anchor = requireField(hint.anchor, 'anchor', op);
+    // Idempotency: nothing to remove if the text is already gone.
+    if (!content.includes(anchor)) {
+      return { file: hint.file, summary: `remove_text ${hint.file} (already removed)` };
+    }
     next = applyTextDelete(content, {
       mode: 'text', action: 'remove', file: hint.file,
       anchor: { type: 'exact', value: anchor },

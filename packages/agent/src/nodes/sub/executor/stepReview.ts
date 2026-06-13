@@ -34,6 +34,13 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     // Mechanical/verification failure — the LLM judge adds nothing here.
     status = 'insufficient';
     reason = state.lastError;
+  } else if (state.verifyPassed === true) {
+    // Programmatic verification (type-check / related tests) ran and passed —
+    // authoritative. Don't ask the LLM judge to re-confirm an already-passing
+    // check; it tends to demand verification that already succeeded and loops a
+    // correct edit to failure.
+    status = 'sufficient';
+    reason = 'Edit applied and verification (type-check/tests) passed.';
   } else {
     const prompt = buildStepReviewPrompt({
       stepTitle: step.title,
@@ -90,6 +97,7 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       currentHints: [],
       lastError: null,
       verifyOutput: null,
+      verifyPassed: null,
     };
   }
 
@@ -103,6 +111,7 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       lastError: reason,
       currentHints: [],
       verifyOutput: null,
+      verifyPassed: null,
     };
   }
 
@@ -119,5 +128,6 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     lastError: reason,
     currentHints: [],
     verifyOutput: null,
+    verifyPassed: null,
   };
 };

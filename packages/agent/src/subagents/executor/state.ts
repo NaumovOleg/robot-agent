@@ -47,6 +47,10 @@ export const ExecutorState = Annotation.Root({
     default: () => ({ typeCheck: null, testRunner: null, lint: null }),
   }),
   verifyOutput: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  // true when a programmatic check (type-check / related tests) ran for the step
+  // and passed; null when no check ran. step_review treats `true` as authoritative
+  // (done) instead of asking the LLM judge to re-confirm already-passed checks.
+  verifyPassed: Annotation<boolean | null>({ reducer: (_, n) => n, default: () => null }),
   // Normalized type-check error signatures captured at init, before any edit.
   // verify_step subtracts these so a step is only blamed for NEW errors it
   // introduced — not pre-existing project tsc noise (test files, etc.).

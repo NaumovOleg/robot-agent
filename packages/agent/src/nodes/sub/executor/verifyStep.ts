@@ -12,9 +12,15 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
   const step = plan?.steps.find((s) => s.id === currentStepId);
   if (!currentStepId || !step) return { lastError: 'verify: no current step' };
 
+  // Tracks whether any programmatic check actually ran for this step. step_review
+  // treats a passing run as authoritative (done) and only consults the LLM judge
+  // when nothing could be verified.
+  let ranAnyCheck = false;
+
   // Tier 2a: type check — compare against the baseline captured at init so the
   // step is only blamed for errors it newly introduced, not pre-existing noise.
   if (verifyCommands.typeCheck) {
+    ranAnyCheck = true;
     const result = await runCommand(verifyCommands.typeCheck, cwd);
     const introduced = newTscErrors(parseTscErrors(result.output), baselineErrors);
     const failed = introduced.length > 0;
@@ -33,6 +39,7 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
       return {
         lastError: `Type check failed — new errors introduced by this edit:\n${tail(detail)}`,
         verifyOutput: tail(detail),
+        verifyPassed: false,
       };
     }
     debug('[executor/verify]', currentStepId, 'typeCheck OK (no new errors)');
@@ -44,6 +51,7 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
     for (const file of step.files) {
       const testFile = await findRelatedTestFile(file, cwd);
       if (!testFile) continue;
+      ranAnyCheck = true;
       const quoted = `'${testFile.replace(/'/g, `'\\''`)}'`;
       const cmd = `${verifyCommands.testRunner} ${quoted}`;
       const result = await runCommand(cmd, cwd);
@@ -56,11 +64,12 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
         return {
           lastError: `Tests failed (${testFile}):\n${tail(result.output)}`,
           verifyOutput: tail(result.output),
+          verifyPassed: false,
         };
       }
       testOutput = tail(result.output);
     }
   }
 
-  return { lastError: null, verifyOutput: testOutput };
+  return { lastError: null, verifyOutput: testOutput, verifyPassed: ranAnyCheck ? true : null };
 };

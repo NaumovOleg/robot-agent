@@ -19,12 +19,14 @@ const normalizeLineRange = (val: unknown): string => {
   return '';
 };
 
-const clipStr = (max: number) => (v: unknown): unknown => {
-  if (v == null) return v;
-  if (typeof v !== 'string') return v;
-  const t = v.trim();
-  return t.length > max ? t.slice(0, max) : t;
-};
+const clipStr =
+  (max: number) =>
+  (v: unknown): unknown => {
+    if (v == null) return v;
+    if (typeof v !== 'string') return v;
+    const t = v.trim();
+    return t.length > max ? t.slice(0, max) : t;
+  };
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -67,12 +69,11 @@ const IdentifierSchema = z
   .max(160)
   .describe('Symbol or identifier name as it appears in source.');
 
-const SourceSnippetSchema = z.preprocess(
-  clipStr(6000),
-  z.string().min(1).max(6000)
-).describe(
-  'Verbatim source code excerpt. Preserve original formatting and indentation. Do not rewrite into prose.'
-);
+const SourceSnippetSchema = z
+  .preprocess(clipStr(6000), z.string().min(1).max(6000))
+  .describe(
+    'Verbatim source code excerpt. Preserve original formatting and indentation. Do not rewrite into prose.'
+  );
 
 // ─── Reader structures ────────────────────────────────────────────────────────
 
@@ -107,10 +108,9 @@ const ReaderFunctionSchema = z
     location: LocationSchema.describe(
       'Location of the function definition. Example: src/app.tsx:43'
     ),
-    bodyPreview: z.preprocess(
-      clipStr(1400),
-      z.string().min(1).max(1400).nullable().default(null)
-    ).describe('First 1-5 lines of the function body verbatim. Auto-truncated at 1400 chars.'),
+    bodyPreview: z
+      .preprocess(clipStr(1400), z.string().min(1).max(1400).nullable().default(null))
+      .describe('First 1-5 lines of the function body verbatim. Auto-truncated at 1400 chars.'),
     calls: z
       .array(IdentifierSchema)
       .max(120)
@@ -182,19 +182,16 @@ const ReaderReferenceUsageSchema = z
   })
   .strict();
 
-const ReaderReferenceSchema = z
-  .object({
-    symbol: IdentifierSchema.describe('Symbol name being tracked.'),
-    usages: z
-      .array(ReaderReferenceUsageSchema)
-      .max(400)
-      .default([])
-      .describe('All observed usages of this symbol across inspected files.'),
-  })
-  // Not strict: LLM sometimes embeds top-level fields (key_findings, potential_edit_strategy)
-  // inside reference objects by mistake — strip them silently rather than rejecting.
-  ;
-
+const ReaderReferenceSchema = z.object({
+  symbol: IdentifierSchema.describe('Symbol name being tracked.'),
+  usages: z
+    .array(ReaderReferenceUsageSchema)
+    .max(400)
+    .default([])
+    .describe('All observed usages of this symbol across inspected files.'),
+});
+// Not strict: LLM sometimes embeds top-level fields (key_findings, potential_edit_strategy)
+// inside reference objects by mistake — strip them silently rather than rejecting.
 // ─── Key findings ─────────────────────────────────────────────────────────────
 
 export const ReaderKeyFindingSchema = z
@@ -215,7 +212,7 @@ export const ReaderKeyFindingSchema = z
 
 // ─── Operation hints ──────────────────────────────────────────────────────────
 
-const AST_OPS = new Set(['replace_node', 'insert_node', 'remove_node', 'rename_symbol'] as const);
+const AST_OPS = new Set(['replace_node', 'insert_node', 'remove_node'] as const);
 
 const SYMBOL_OPS = new Set(['replace_node', 'remove_node', 'rename_symbol'] as const);
 
@@ -246,12 +243,12 @@ const OperationHintSchema = z
     nodeType: ShortTextSchema.nullable()
       .default(null)
       .describe(
-        'Required for AST ops (replace_node, insert_node, remove_node, rename_symbol). Tree-sitter node type. Example: variable_declarator.'
+        'Required for AST ops (replace_node, insert_node, remove_node). Tree-sitter node type. Example: variable_declarator.'
       ),
     symbol: IdentifierSchema.nullable()
       .default(null)
       .describe(
-        'Required for symbol-targeted ops (replace_node, remove_node, rename_symbol). Symbol name exactly as declared.'
+        'Symbol name exactly as declared. Required for replace_node, remove_node, and rename_symbol.'
       ),
     newSymbol: IdentifierSchema.nullable()
       .default(null)
@@ -320,7 +317,6 @@ const OperationHintSchema = z
         message: `anchor is required for op "${data.op}".`,
       });
     }
-
   });
 
 // ─── Edit strategy ────────────────────────────────────────────────────────────
