@@ -1,12 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  type ProjectContext,
   getFileTree,
   getGitBranch,
   detectTechStack,
   getValidationCommands,
 } from '@robocode-packages/shared';
+
+// Rich project-context shape used by the legacy ContextService / reader prompt.
+// Defined locally because shared's `ProjectContext` was narrowed to
+// `{ name, frameworks }` (the `.project` sub-object of WorkspaceContext) during
+// the context refactor — that narrow type is a different concept from this one.
+export interface ProjectContext {
+  cwd: string;
+  projectName: string;
+  packageJson: Record<string, unknown> | null;
+  packageScripts: string[];
+  policyFiles: string[];
+  policyDocuments: { file: string; content: string }[];
+  validationCommands: string[];
+  gitBranch: string | null;
+  techStack: string[];
+  structure: string;
+}
 
 const contextCache = new Map<string, { ts: number; ctx: ProjectContext }>();
 const CACHE_TTL = 60_000;
@@ -46,8 +62,8 @@ export const gatherProjectContext = async (cwd?: string): Promise<ProjectContext
   try {
     const raw = fs.readFileSync(path.join(root, 'package.json'), 'utf-8');
     packageJson = JSON.parse(raw);
-  } catch (error) {
-    /* empty */
+  } catch {
+    /* no package.json — leave packageJson null */
   }
 
   const [gitBranch, structure] = await Promise.all([getGitBranch(root), getFileTree(root)]);

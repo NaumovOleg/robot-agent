@@ -1,4 +1,4 @@
-import type { ReaderStateType } from '../../../main/subagents/reader';
+import type { ReaderStateType } from '../../../subagents/reader';
 import { debug, ReaderOutputSchema, isAIMessage } from '@robocode-packages/shared';
 import { SystemMessage } from '@langchain/core/messages';
 import { createBaseModel } from '../../../utils';

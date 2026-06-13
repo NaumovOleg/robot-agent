@@ -7,14 +7,9 @@ export type ToolRisk = 'safe' | 'moderate' | 'destructive';
 export type PlanRisk = 'low' | 'medium' | 'high';
 export type PlanStepKind = 'inspect' | 'edit' | 'create' | 'delete';
 
-export interface PlanStep {
-  id: string;
-  kind: PlanStepKind;
-  title: string;
-  files: string[];
-  depends_on: string[];
-  expected_output: string;
-}
+// NOTE: PlanStep is intentionally NOT defined here. It is the canonical
+// Zod-inferred type exported from schemas/planner.ts (via the ./schemas barrel).
+// Defining it here too caused an ambiguous re-export (TS2308) at the package root.
 
 export interface PendingToolCall {
   id: string;

@@ -1,6 +1,13 @@
 import { gatherProjectContext } from '../helpers';
-import type { ProjectContext, CacheEntry } from '@robocode-packages/shared';
+import type { ProjectContext } from '../helpers/context';
 import { debug, getGitStatus } from '@robocode-packages/shared';
+
+interface CacheEntry {
+  context: ProjectContext;
+  timestamp: number;
+  watchedFiles: Map<string, number>;
+  gitSignature: string | null;
+}
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONTEXT_TTL_MS, WATCHED_FILES } from '@robocode-packages/config';

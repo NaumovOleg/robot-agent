@@ -4,9 +4,8 @@ import type {
   WorkspaceContext,
   RouterIntentOutput,
   ClarificationSource,
-  PlannerOutput,
 } from '../types';
-import type { StepResult } from '../schemas/executor/types';
+import type { PlannerOutput, StepResult } from '../schemas';
 
 export const RootState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({ reducer: messagesStateReducer, default: () => [] }),

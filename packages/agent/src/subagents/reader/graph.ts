@@ -1,5 +1,5 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
-import { toolsNode, agentNode, finalReadNode } from '../../../nodes/sub/reader';
+import { toolsNode, agentNode, finalReadNode } from '../../nodes/sub/reader';
 import { router } from './router';
 
 import { ReaderState } from './state';

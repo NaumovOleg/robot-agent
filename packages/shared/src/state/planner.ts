@@ -1,5 +1,6 @@
 import { Annotation } from '@langchain/langgraph';
-import type { PlannerOutput, WorkspaceContext, RouterIntentOutput } from '../types';
+import type { WorkspaceContext, RouterIntentOutput } from '../types';
+import type { PlannerOutput } from '../schemas';
 
 export const PlannerState = Annotation.Root({
   // ── input ─────────────────────────────────────────────────────────────────

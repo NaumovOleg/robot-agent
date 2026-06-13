@@ -1,6 +1,6 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { readerGraph } from '../main/subagents/reader';
+import { readerGraph } from '../subagents/reader';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { HumanMessage } from '@langchain/core/messages';
 

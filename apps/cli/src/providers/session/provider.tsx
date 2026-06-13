@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { SessionService, EventBus, MessageService } from '@robocode-packages/core';
-import { Session, debug } from '@robocode-packages/shared';
+import { Session } from '@robocode-packages/shared';
 import { SessionContext } from './ctx';
 
 interface Props {

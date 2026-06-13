@@ -1,8 +1,8 @@
 import { PlannerOutputSchema } from '../../schemas';
+import type { PlannerOutput } from '../../schemas';
 
-import type { z } from 'zod';
-
-export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
+// PlannerOutput is re-exported from the ./schemas barrel (schemas/planner.ts).
+// We only import it here to extend it — re-declaring it caused TS2308 ambiguity.
 
 export interface Plan extends PlannerOutput {
   schema_version?: string;

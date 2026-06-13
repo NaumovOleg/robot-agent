@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm --filter @robocode-packages/core build && pnpm --filter @robocode-packages/shared build && pnpm --filter @robocode-packages/config build && pnpm --filter @robocode-packages/providers build && pnpm --filter @robocode-packages/tools build && pnpm --filter @robocode-packages/agent build && pnpm --filter @robocode-packages/ui build && pnpm --filter @robocode-packages/cli build",
+    "build": "pnpm --filter @robocode-packages/config build && pnpm --filter @robocode-packages/shared build && pnpm --filter @robocode-packages/providers build && pnpm --filter @robocode-packages/core build && pnpm --filter @robocode-packages/tools build && pnpm --filter @robocode-packages/agent build && pnpm --filter robocode build",
     "start": "node apps/cli/dist/index.js",
     "dev": "pnpm --filter robocode dev",
     "lint": "eslint . --ext .ts,.tsx",

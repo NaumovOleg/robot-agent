@@ -3,12 +3,13 @@ import type { RootStateType } from '@robocode-packages/shared';
 import { plannerGraph } from '../../graphs/planner';
 
 export const plannerNode = async (state: RootStateType) => {
-  const { context, router, sessionId, answer } = state;
+  const { context, router, sessionId } = state;
   if (!router.intent) return {};
 
   // same pattern as routerIntentNode:
-  // collect all human requests — original + any clarification answers
-  const requests = router.intent.resolvedRequest;
+  // collect all human requests — original + any clarification answers.
+  // resolvedRequest is a single canonical string; plannerGraph expects string[].
+  const requests = [router.intent.resolvedRequest];
 
   // if user just answered a clarification question, that answer is
   // already appended to router.userRequests via preRoute
