@@ -205,7 +205,8 @@ describe('dispatchHint', () => {
         dir
       )
     ).rejects.toThrow(/Syntax error/);
-    // file is left written — rollback is the caller's job via snapshots
+    // Syntax is checked before writing: broken edits do not corrupt the file on disk.
+    expect(await read('a.ts')).toContain('return "hi";');
   });
 
   it('fails on missing required fields with a clear message', async () => {

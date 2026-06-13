@@ -127,9 +127,9 @@ const astEditFromHint = (hint: ExecutorHint, action: AstEdit['action']): AstEdit
 });
 
 const writeAndCheck = async (abs: string, content: string): Promise<void> => {
-  await fs.writeFile(abs, content, 'utf-8');
   const syntax = await checkSyntax(abs, content);
   if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
+  await fs.writeFile(abs, content, 'utf-8');
 };
 
 // Applies one hint mechanically. Reads the file fresh from disk (previous hints
@@ -143,13 +143,17 @@ export const dispatchHint = async (
 
   // ── file-level ops (no content read) ────────────────────────────────────────
   if (op === 'create_file') {
-    resolveInside(cwd, hint.file);
+    const abs = resolveInside(cwd, hint.file);
     const content = requireField(hint.newContent, 'newContent', op);
+    const syntax = await checkSyntax(abs, content);
+    if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
     const { absPath } = await applyFileInsert(cwd, {
       mode: 'file', action: 'insert', file: hint.file, insertText: content, reasoning: '',
     });
-    const syntax = await checkSyntax(absPath, content);
-    if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
+    if (absPath !== abs) {
+      const postWriteSyntax = await checkSyntax(absPath, content);
+      if (!postWriteSyntax.ok) throw new Error(postWriteSyntax.error ?? 'Syntax check failed (no detail)');
+    }
     return { file: hint.file, summary: `create_file ${hint.file}` };
   }
 

@@ -65,7 +65,7 @@ describe('checkSyntax', () => {
     const file = path.join(dir, 'bad.ts');
     const res = await checkSyntax(file, 'export const a = {;\n');
     expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/line \d+/i);
+    expect(res.error).toMatch(/(:\d+:\d+|line \d+)/i);
   });
 
   it('skips unsupported extensions', async () => {

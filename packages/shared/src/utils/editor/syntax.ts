@@ -34,6 +34,7 @@ export const checkSyntax = async (
 
   const errNode = findFirstError(tree.rootNode);
   const row = errNode?.startPosition.row ?? 0;
+  const col = (errNode?.startPosition.column ?? 0) + 1;
   const line = row + 1;
 
   // Include the offending line and a little context so the editor can SEE what it
@@ -45,9 +46,13 @@ export const checkSyntax = async (
     .slice(from, to)
     .map((l, i) => `${from + i + 1} | ${l}`)
     .join('\n');
+  const nodeType = errNode?.type ?? 'unknown';
+  const pointer = `${' '.repeat(String(line).length + 3 + Math.max(0, col - 1))}^`;
 
   return {
     ok: false,
-    error: `Syntax error near line ${line} in ${filePath} (the edit produced invalid code):\n${snippet}`,
+    error:
+      `Syntax error at ${filePath}:${line}:${col} ` +
+      `(node=${nodeType}, the edit produced invalid code):\n${snippet}\n${pointer}`,
   };
 };

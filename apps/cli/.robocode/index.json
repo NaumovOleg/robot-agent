@@ -1,1 +1,14 @@
-[{"id":"950cc7ac-9e32-4071-8505-d24c84b5e029","name":"Session 6/13/2026","createdAt":"2026-06-13T09:04:07.563Z","updatedAt":"2026-06-13T09:04:26.807Z","messageCount":2,"active":true,"cwd":"/Users/oleg/Documents/projects/robocode-cli/apps/cli","transcriptPath":".robocode/sessions/950cc7ac-9e32-4071-8505-d24c84b5e029.md","auditPath":".robocode/sessions/950cc7ac-9e32-4071-8505-d24c84b5e029.events.ndjson"}]
+[
+  {
+    "id": "a4dfbfc6-8767-489a-9fa8-231cc714977c",
+    "name": "Session 6/13/2026",
+    "createdAt": "2026-06-13T12:28:07.399Z",
+    "updatedAt": "2026-06-13T12:31:34.950Z",
+    "messageCount": 12,
+    "active": true,
+    "cwd": "/Users/oleg/Documents/projects/robocode-cli/apps/cli",
+    "transcriptPath": ".robocode/sessions/a4dfbfc6-8767-489a-9fa8-231cc714977c.md",
+    "auditPath": ".robocode/sessions/a4dfbfc6-8767-489a-9fa8-231cc714977c.events.ndjson",
+    "summary": "AI: The routing logic in src/app.tsx was refactored and updated for improved navigation clarity a..."
+  }
+]
