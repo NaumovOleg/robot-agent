@@ -43,6 +43,7 @@ export const stepSelectorNode = async (state: ExecutorStateType) => {
       lastError: null,
       verifyOutput: null,
       verifyPassed: null,
+      errorFiles: [],
       currentHints: [],
     };
   }

@@ -50,9 +50,8 @@ describe('executor graph (mocked LLM)', () => {
   it('happy path: edit step applies hints, reviews sufficient, finishes done', async () => {
     llmQueue.push(
       // mini_reader output
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 2;' }] },
-      // step_review output
-      { status: 'sufficient', reason: 'value updated' }
+      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 2;' }] }
+      // step_review no longer calls the LLM — it's a programmatic gate now.
     );
 
     const graph = createExecutorGraph();
@@ -72,8 +71,7 @@ describe('executor graph (mocked LLM)', () => {
   it('retry path: bad anchor rolls back, second attempt succeeds', async () => {
     llmQueue.push(
       { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG ANCHOR', newContent: 'x' }] }, // attempt 1 → apply fails
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 3;' }] }, // attempt 2
-      { status: 'sufficient', reason: 'ok' } // review of attempt 2
+      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 3;' }] } // attempt 2
     );
 
     const graph = createExecutorGraph();

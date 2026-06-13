@@ -13,6 +13,10 @@ export interface MiniReaderPromptInput {
   producedFiles?: string[];
   // Existing sibling files to mirror conventions from when creating new files.
   references?: { file: string; content: string }[];
+  // Files the last verification errors point to — editable to fix cross-file errors.
+  errorFiles?: { file: string; content: string }[];
+  // Project import path aliases (e.g. "@screens" → "src/screens/index.ts").
+  aliases?: { alias: string; path: string }[];
   lastError: string | null;
   userGuidance: string | null;
   appliedOps: string[];
@@ -27,12 +31,22 @@ export const withLineNumbers = (content: string): string =>
     .join('\n');
 
 export const buildMiniReaderPrompt = (input: MiniReaderPromptInput): string => {
-  const { step, goal, constraints, files, findings, producedFiles, references, lastError, userGuidance, appliedOps } =
+  const { step, goal, constraints, files, findings, producedFiles, references, errorFiles, aliases, lastError, userGuidance, appliedOps } =
     input;
 
   const referenceBlocks = (references ?? [])
     .map(({ file, content }) => `### ${file}\n\`\`\`\n${content}\n\`\`\``)
     .join('\n\n');
+
+  const errorFileBlocks = (errorFiles ?? [])
+    .map(({ file, content }) => {
+      const clipped =
+        content.length > MAX_FILE_CHARS ? content.slice(0, MAX_FILE_CHARS) + '\n…[truncated]' : content;
+      return `### ${file}\n\`\`\`\n${withLineNumbers(clipped)}\n\`\`\``;
+    })
+    .join('\n\n');
+
+  const aliasBlock = (aliases ?? []).map((a) => `- ${a.alias} → ${a.path}`).join('\n');
 
   const fileBlocks = files
     .map(({ file, content }) => {
@@ -103,7 +117,26 @@ ${referenceBlocks}
 `
     : ''
 }
-## Current file contents (fresh from disk, line-numbered)
+${
+  aliasBlock
+    ? `
+## Import path aliases (tsconfig "paths" / module resolution)
+Each alias maps to ONE exact module (usually a barrel index). \`@x/sub/File\` does
+NOT resolve unless that alias is a wildcard. To import a file not re-exported by a
+barrel, use a relative path or add it to the barrel.
+${aliasBlock}
+`
+    : ''
+}${
+  errorFileBlocks
+    ? `
+## Files with verification errors (you MAY edit these to fix the errors)
+The last type check reported errors in these files. Emit hints to fix them — e.g.
+add a missing union member, fix an import path — in addition to the step's files.
+${errorFileBlocks}
+`
+    : ''
+}## Current file contents (fresh from disk, line-numbered)
 ${fileBlocks || '(no existing files — this step creates new ones)'}
 ${retryBlock}
 

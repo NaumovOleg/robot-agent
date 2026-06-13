@@ -57,6 +57,24 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     seenRef.has(r.file) ? false : (seenRef.add(r.file), true)
   );
 
+  // Files the final verification errors point to that this step doesn't already
+  // read — load them so the retry can fix cross-file errors it introduced.
+  const errorOnly = (state.errorFiles ?? []).filter((f) => !ownFiles.has(f));
+  const errorFiles = (
+    await Promise.all(
+      errorOnly.map(async (file) => {
+        const content = await fs.readFile(path.resolve(cwd, file), 'utf-8').catch(() => null);
+        return content === null ? null : { file, content };
+      })
+    )
+  ).filter((f): f is { file: string; content: string } => f !== null);
+
+  // Project import path aliases so the editor uses valid module specifiers.
+  const aliases = (state.context?.language?.aliases ?? []).map((a) => ({
+    alias: a.name,
+    path: a.path,
+  }));
+
   const prompt = buildMiniReaderPrompt({
     step,
     goal: plan.goal,
@@ -65,6 +83,8 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
     findings,
     producedFiles,
     references: uniqueReferences,
+    errorFiles,
+    aliases,
     lastError: state.lastError,
     userGuidance: state.userGuidance,
     appliedOps: state.appliedOps[step.id] ?? [],

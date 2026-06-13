@@ -36,6 +36,34 @@ describe('verifyStepNode', () => {
     expect(res.lastError).toBeNull();
   });
 
+  it('DEFERS typeCheck while another mutating step is still pending', async () => {
+    // A failing typeCheck command — but a second create step is pending, so this
+    // is NOT the final mutation and tsc must NOT run (no false failure).
+    const state = {
+      ...(mkState(dir, { typeCheck: 'node -e "process.exit(1)"' }) as Record<string, unknown>),
+      plan: {
+        goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
+        files_affected: ['src/a.ts'], gitStep: null,
+        steps: [
+          { id: 'edit-a', kind: 'edit', title: 't', files: ['src/a.ts'], depends_on: [], expected_output: 'e' },
+          { id: 'create-b', kind: 'create', title: 't', files: ['src/b.ts'], depends_on: [], expected_output: 'e' },
+        ],
+      },
+      stepStates: { 'edit-a': 'running', 'create-b': 'pending' },
+    };
+    const res = await verifyStepNode(state as never);
+    expect(res.lastError).toBeNull();
+    expect(res.verifyPassed).toBeNull(); // nothing ran
+  });
+
+  it('reports the error files when the final typeCheck fails', async () => {
+    const cmd =
+      'node -e "console.error(\'src/types/router.ts(1,1): error TS2678: x\'); process.exit(1)"';
+    const res = await verifyStepNode(mkState(dir, { typeCheck: cmd }));
+    expect(res.lastError).toMatch(/Type check failed/);
+    expect(res.errorFiles).toContain('src/types/router.ts');
+  });
+
   it('fails with output tail when typeCheck fails', async () => {
     const res = await verifyStepNode(
       mkState(dir, { typeCheck: 'node -e "console.error(\'error TS2304: boom\'); process.exit(1)"' })

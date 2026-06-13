@@ -1,7 +1,7 @@
 import { debug, runCommand } from '@robocode-packages/shared';
 import type { StepStatus } from '@robocode-packages/shared';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
-import { parseTscErrors } from './tscErrors';
+import { parseVerifyErrors } from './verifyErrors';
 
 const hasCycle = (steps: { id: string; depends_on: string[] }[]): boolean => {
   const visiting = new Set<string>();
@@ -50,7 +50,7 @@ export const initNode = async (state: ExecutorStateType) => {
   let baselineErrors: string[] = [];
   if (verifyCommands.typeCheck) {
     const baseline = await runCommand(verifyCommands.typeCheck, state.cwd);
-    baselineErrors = parseTscErrors(baseline.output);
+    baselineErrors = parseVerifyErrors(baseline.output);
   }
 
   debug(

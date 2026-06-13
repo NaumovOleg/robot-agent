@@ -54,6 +54,11 @@ export const ExecutorState = Annotation.Root({
     default: () => ({ typeCheck: null, testRunner: null, lint: null }),
   }),
   verifyOutput: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  // Repo-relative files named in the LAST verification's NEW errors. The retrying
+  // mini-reader may edit these (even if outside the plan step's own files) to fix
+  // errors the edit introduced in other files — e.g. add a member to a type union
+  // in another file. Enables cross-file self-correction.
+  errorFiles: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
   // true when a programmatic check (type-check / related tests) ran for the step
   // and passed; null when no check ran. step_review treats `true` as authoritative
   // (done) instead of asking the LLM judge to re-confirm already-passed checks.

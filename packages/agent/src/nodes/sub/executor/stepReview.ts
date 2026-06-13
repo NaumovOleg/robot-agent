@@ -1,9 +1,6 @@
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { EventBus } from '@robocode-packages/core';
-import { debug, StepReviewOutputSchema } from '@robocode-packages/shared';
+import { debug } from '@robocode-packages/shared';
 import type { StepResult, StepReviewStatus } from '@robocode-packages/shared';
-import { getModel } from '../../../utils';
-import { buildStepReviewPrompt } from '../../../prompts/sub/executor/stepReview';
 import { restoreSnapshot } from './snapshots';
 import { MAX_STEP_RETRIES } from '../../../subagents/executor/state';
 import type { ExecutorStateType } from '../../../subagents/executor/state';
@@ -25,52 +22,24 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
   if (!currentStepId || !step) return { currentStepId: null };
 
   const retries = state.retryCounts[currentStepId] ?? 0;
-  const applied = state.appliedOps[currentStepId] ?? [];
 
+  // The gate is programmatic, not an LLM judge: a step is "done" once its edits
+  // applied cleanly (apply already ran a tree-sitter syntax check). The
+  // authoritative whole-project type check runs once at the final mutation
+  // (verify_step) and routes its failures back here as lastError — including
+  // errors in OTHER files, which the retry is allowed to fix. An earlier LLM
+  // judge was removed: it was unreliable (kept demanding already-passed checks).
   let status: StepReviewStatus;
   let reason: string;
-
   if (state.lastError) {
-    // Mechanical/verification failure — the LLM judge adds nothing here.
     status = 'insufficient';
     reason = state.lastError;
-  } else if (state.verifyPassed === true) {
-    // Programmatic verification (type-check / related tests) ran and passed —
-    // authoritative. Don't ask the LLM judge to re-confirm an already-passing
-    // check; it tends to demand verification that already succeeded and loops a
-    // correct edit to failure.
-    status = 'sufficient';
-    reason = 'Edit applied and verification (type-check/tests) passed.';
   } else {
-    const prompt = buildStepReviewPrompt({
-      stepTitle: step.title,
-      expectedOutput: step.expected_output,
-      appliedOps: applied,
-      verifyOutput: state.verifyOutput,
-    });
-    try {
-      const model = getModel(false).withStructuredOutput(StepReviewOutputSchema, {
-        name: 'step_review',
-      });
-      const review = await model.invoke([
-        new SystemMessage(prompt),
-        new HumanMessage('Review the step result.'),
-      ]);
-      status = review.status;
-      reason = review.reason;
-    } catch (err) {
-      const verificationRan = !!(state.verifyCommands.typeCheck || state.verifyCommands.testRunner);
-      if (verificationRan) {
-        // cheap tiers passed (no lastError) — accept rather than loop on infra errors
-        debug('[executor/step_review] judge LLM failed, accepting on verification', err);
-        status = 'sufficient';
-        reason = 'Verification passed; review LLM unavailable.';
-      } else {
-        debug('[executor/step_review] judge LLM failed, no verification configured', err);
-        status = 'insufficient';
-        reason = `Review LLM unavailable and no verification was configured: ${String(err).slice(0, 200)}`;
-      }
-    }
+    status = 'sufficient';
+    reason =
+      state.verifyPassed === true
+        ? 'Edit applied and the final type check passed.'
+        : 'Edit applied (syntax ok); type check deferred to the final mutation.';
   }
 
   const outcome = decideStepOutcome(status, retries);
@@ -98,6 +67,7 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       lastError: null,
       verifyOutput: null,
       verifyPassed: null,
+      errorFiles: [],
     };
   }
 
@@ -129,5 +99,6 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     currentHints: [],
     verifyOutput: null,
     verifyPassed: null,
+    errorFiles: [],
   };
 };

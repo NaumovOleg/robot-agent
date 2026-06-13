@@ -21,17 +21,15 @@ export const applyNode = async (state: ExecutorStateType) => {
     return { lastError: state.lastError ?? 'apply: nothing to apply' };
   }
 
-  // Snapshot all files this step touches — once per step. On retry the snapshot
-  // already holds the pristine pre-step content; never overwrite it.
-  const existing = state.fileSnapshots[currentStepId];
-  const fileSnapshots = existing
-    ? { [currentStepId]: existing }
-    : {
-        [currentStepId]: await takeSnapshot(
-          cwd,
-          currentHints.flatMap((h) => (h.target ? [h.file, h.target] : [h.file]))
-        ),
-      };
+  // Snapshot every file this attempt touches so it can be rolled back. Keep any
+  // pristine pre-step content already captured, and ADD snapshots for files this
+  // attempt newly touches (a retry may edit other files — e.g. a cross-file type
+  // fix — that weren't in the first attempt's snapshot).
+  const existing = state.fileSnapshots[currentStepId] ?? {};
+  const touchedFiles = currentHints.flatMap((h) => (h.target ? [h.file, h.target] : [h.file]));
+  const newFiles = touchedFiles.filter((f) => !(f in existing));
+  const added = newFiles.length > 0 ? await takeSnapshot(cwd, newFiles) : {};
+  const fileSnapshots = { [currentStepId]: { ...existing, ...added } };
 
   const applied: string[] = [];
   const touched: string[] = [];
