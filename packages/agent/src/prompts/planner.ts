@@ -95,8 +95,11 @@ files_affected:
 
 steps:
   Ordered DAG of atomic work units. Rules:
-  - Inspect steps ALWAYS come before edit/create/delete steps on the same files
-  - Every edit/create/delete step MUST depend on at least one inspect step covering its files
+  - Inspect steps ALWAYS come before edit/delete steps on the SAME existing files
+  - Every EDIT and DELETE step MUST depend on at least one inspect step covering its files
+  - CREATE steps make a NEW file that does not exist yet — there is nothing to
+    inspect, so a create step needs NO inspect dependency. Do NOT add an inspect
+    step for a file you are creating in this plan.
   - depends_on references step IDs that appear earlier in the array
   - No circular dependencies
   - Max 10 steps, min 1 step
@@ -112,8 +115,9 @@ gitStep:
 
 ## Planning rules
 
-1. Start with inspect steps for every file you plan to edit.
+1. Start with inspect steps for every EXISTING file you plan to edit or delete.
    The reader needs to see files before the executor can safely change them.
+   Never inspect a file you are going to create in this same plan.
 
 2. Use explicit file paths from intent.explicitFiles when present.
    Do not duplicate files already in selectedFiles unless you have a specific reason.

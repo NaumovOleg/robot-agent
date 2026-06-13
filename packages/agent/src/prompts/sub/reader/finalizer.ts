@@ -41,16 +41,22 @@ Use tool results as the single source of truth. Never fabricate symbols, paths, 
 
 ## Status rules
 
-Set \`status\` based on the following strict criteria:
+The downstream editor consumes mainly your \`summary\` and \`key_findings\`. Make
+THOSE excellent. \`functions\`, \`classes\`, \`imports\`, \`references\` are OPTIONAL
+supporting evidence — include what you observed, but their absence NEVER lowers
+the status.
 
-- **\`sufficient\`**: ALL of the following must be true:
-  1. At least one concrete edit location is known (file + symbol/anchor/line range).
-  2. For any code file with functions, classes, or external imports — at least one of \`functions\`, \`classes\`, \`imports\`, or \`references\` is non-empty. **Exception**: barrel files (files containing only \`export * from ...\` or \`export { X } from ...\` re-exports and nothing else) legitimately have no AST evidence; \`functions/classes/imports/references\` may all be empty for them.
-  3. **Strongly preferred**: \`potential_edit_strategy\` is non-null with a concrete \`goal\`, non-empty \`files_to_modify\`, and \`instructions\`. If you cannot fully structure the strategy, set it to null — the downstream planner will derive a plan from your \`key_findings\` and \`functions\` evidence instead.
+- **\`sufficient\`**: you identified at least one concrete edit location (a file
+  plus a symbol, a unique single-line anchor, or a target path for create/delete)
+  AND your \`summary\` + at least one \`key_finding\` describe it. Empty
+  \`functions/classes/imports/references\` is fine.
 
-- **\`insufficient\`**: Evidence was gathered but one or more concrete edit locations are unknown, or AST evidence is missing for an analyzed code file that has functions/classes/declarations. Populate \`unresolvedQuestions\` with the specific blocking gaps.
+- **\`insufficient\`**: you could NOT identify any concrete edit location, or a
+  real blocking unknown remains. Populate \`unresolvedQuestions\` with the specific
+  gaps.
 
-- **\`blocked\`**: Investigation cannot proceed due to missing files, permissions, or unresolvable external dependencies. Populate \`unresolvedQuestions\` explaining what is blocking.
+- **\`blocked\`**: investigation cannot proceed due to missing files, permissions,
+  or unresolvable external dependencies. Populate \`unresolvedQuestions\`.
 
 ## Output contract
 
@@ -80,12 +86,13 @@ Set \`status\` based on the following strict criteria:
 
 - \`language\`: Set to the primary language detected (e.g., \`"typescript"\`, \`"python"\`, \`"go"\`). This helps downstream tools generate correct verification commands.
 
-- \`functions\`:
+- \`functions\` (OPTIONAL — include only if you actually inspected functions):
   - Include only functions/components observed via \`ast_analyzer\` or \`read_file\`.
+  - Required per item: \`name\` and \`location\`. Everything else is best-effort —
+    omit \`signature\`, \`params\`, \`calls\`, \`bodyPreview\` if you don't have them
+    rather than guessing. \`params\`/\`calls\` are plain string arrays of names.
   - Preserve \`nodeType\` and \`parentNodeType\` from AST output when available.
-  - \`bodyPreview\`: Copy the **first 1–5 lines** of the function body verbatim — stop after line 5. Never include the full body of long functions.
-  - \`calls\`: List function/hook names called inside this function (observed only, no inference).
-  - \`signature\`: Include the full declaration signature as it appears in source.
+  - \`bodyPreview\`: at most the first 1–5 lines of the body, verbatim.
 
 - \`classes\`:
   - Populate \`methods\` and \`properties\` with observed identifiers only.
@@ -109,13 +116,14 @@ Set \`status\` based on the following strict criteria:
   - Each question must be actionable — something a user could answer to unblock the edit plan.
   - Example: "Is the AuthService injected via constructor or module-level? Line 42 of auth.service.ts is ambiguous."
 
-## AST preference rule
+## AST evidence (optional, best-effort)
 
-For analyzed code files, ALWAYS prefer AST-derived evidence over textual guesses:
-- Call \`ast_analyzer\` before finalizing to populate \`functions\`, \`classes\`, \`imports\`, \`references\`.
-- If \`status\` is \`sufficient\` and analyzed files include code files (non-barrel), at least one of \`functions\`, \`classes\`, \`imports\`, or \`references\` MUST be non-empty.
-- If AST evidence is absent for an analyzed code file that HAS functions/classes/declarations, MUST set \`status\` to \`insufficient\` and explain in \`unresolvedQuestions\`.
-- **Barrel files** (containing only \`export * from ...\` or \`export { X } from ...\` statements with no functions or classes) have no AST evidence to collect. Empty \`functions/classes/imports/references\` is correct for them; they do not require status \`insufficient\`.
+If you already ran \`ast_analyzer\`, copy its observed \`functions\`/\`classes\`/
+\`imports\`/\`references\` into the output. These fields are supporting detail only:
+- Never invent them — include only what tool results actually showed.
+- Their absence does NOT make the output \`insufficient\`. A precise \`summary\` and
+  one good \`key_finding\` (file + anchor + why) are what the editor actually uses.
+- Do NOT mark a file \`insufficient\` merely because AST fields are empty.
 
 ## Concrete location definition
 

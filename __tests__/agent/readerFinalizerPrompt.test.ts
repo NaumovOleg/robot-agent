@@ -17,6 +17,20 @@ describe('READER_FINALIZER_PROMPT', () => {
     expect(prompt).toContain('`files_to_modify` must be a subset of `filesAnalyzed`.');
     expect(prompt).toContain('target the exact observed symbol name');
     expect(prompt).toContain('set `potential_edit_strategy` to `null`');
-    expect(prompt).toContain('If `status` is `sufficient` and analyzed files include code files');
+  });
+
+  it('treats AST evidence as optional, focusing on summary + key_findings', () => {
+    const prompt = READER_FINALIZER_PROMPT({
+      task: 't',
+      cwd: '/repo',
+      user_goal: 'g',
+      current_plan_step: 's',
+    });
+    // The strict "AST evidence required / must be non-empty / must set insufficient"
+    // rules were removed to match the tolerant reader schema.
+    expect(prompt).not.toMatch(/at least one of[\s\S]*MUST be non-empty/);
+    expect(prompt).not.toMatch(/MUST set[\s\S]*status[\s\S]*insufficient/);
+    expect(prompt).toMatch(/OPTIONAL[\s\S]*supporting evidence/);
+    expect(prompt).toMatch(/summary[\s\S]*key_findings/);
   });
 });
