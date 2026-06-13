@@ -66,23 +66,26 @@ config  ←  core  ←  shared  ←  tools  ←  agent  ←  (apps/cli)
 The system has **one root graph** and **three subagent graphs**, all compiled with the shared SQLite `Checkpointer` (except the reader graph, which has no checkpointer).
 
 #### Root Graph (`packages/agent/src/main/root/graph.ts`)
+
 Nodes: `agent` → `tools` → (router) → `collect_reader_answers` | `edit_intent` | `after_tool`
 
 - **`agentNode`**: Root LLM (orchestrator). Bound tools: `validate_project`, `delegate_to_reader`, `delegate_to_writer`, `delegate_to_git`. Never reads/writes files directly.
 - **`rootToolsNode`**: LangGraph `ToolNode` that executes tool calls. The reader tool wraps `readerAgent.run()`.
-- **`collect_reader_answers`**: When reader returns `unresolvedQuestions`, this node uses `interrupt()` to ask the user questions one at a time. Resumed via `agent:resume:reader_questions` event → `RoboAgent.resumeReaderQuestions()`.
+- **`collect_reader_answers`**: When reader returns `unresolved_questions`, this node uses `interrupt()` to ask the user questions one at a time. Resumed via `agent:resume:reader_questions` event → `RoboAgent.resumeReaderQuestions()`.
 - **`editIntentNode`**: Converts `ReaderOutput` → `IntentSchema` using a two-stage LLM call (`buildEditIntent` scaffold → structured output).
-- Root router (`route.ts`): After `tools`, checks last ToolMessage — if it contains a reader payload with `unresolvedQuestions` → `collect_reader_answers`; if it has a resolved payload → `edit_intent`; otherwise → `after_tool` (currently a passthrough).
+- Root router (`route.ts`): After `tools`, checks last ToolMessage — if it contains a reader payload with `unresolved_questions` → `collect_reader_answers`; if it has a resolved payload → `edit_intent`; otherwise → `after_tool` (currently a passthrough).
 
 #### Reader Subagent (`packages/agent/src/main/subagents/reader/`)
+
 Graph: `START → agent → (router) → tools → agent → ... → final → END`
 
 - No checkpointer. Called as a regular LangChain tool.
 - `agentNode`: LLM with `READER_TOOLS_SET`. Performs code investigation.
-- `finalReadNode`: Structured-output LLM call producing `ReaderOutputSchema` (v2). Includes `unresolvedQuestions`, `potential_edit_strategy`, AST evidence.
+- `finalReadNode`: Structured-output LLM call producing `ReaderOutputSchema` (v2). Includes `unresolved_questions`, `potential_edit_strategy`, AST evidence.
 - Output flows back to root as `{ editIntentInputPayload }` in the tool result.
 
 #### Editor Subagent (`packages/agent/src/main/subagents/editor/`)
+
 Graph: `START → agent → tool_approval → tools → final → END`
 
 - Has checkpointer. Supports `interrupt()` for tool approval.
@@ -92,6 +95,7 @@ Graph: `START → agent → tool_approval → tools → final → END`
 - Resumed via `agent:resume:editor` event → `EditorAgent.resume()`.
 
 #### Git Subagent (`packages/agent/src/main/subagents/git/`)
+
 Graph shell exists but nodes are commented out — not yet active.
 
 ### Key Data Flow
@@ -101,8 +105,8 @@ User message
   → RoboAgent.run()
   → root graph: agentNode (orchestrator LLM)
   → delegate_to_reader tool
-    → readerAgent.run() → reader graph → ReaderOutput { unresolvedQuestions, potential_edit_strategy }
-  → if unresolvedQuestions: collect_reader_answers (interrupt per question)
+    → readerAgent.run() → reader graph → ReaderOutput { unresolved_questions, potential_edit_strategy }
+  → if unresolved_questions: collect_reader_answers (interrupt per question)
   → editIntentNode: buildEditIntent(readerOutput) → EDIT_INTENT_HUMAN_PROMPT → IntentSchema
   → delegate_to_writer tool (not yet wired to editor subagent in root tools)
 ```
@@ -118,8 +122,9 @@ User message
 ### Interrupt / Resume Pattern
 
 All human-in-the-loop interactions use LangGraph's `interrupt()`:
+
 - Plan approval: `agent:plan_pending` → `interrupt()` → `agent:resume` event
-- Tool approval (editor): `agent:tool_pending` → `interrupt()` → `agent:resume:editor` event  
+- Tool approval (editor): `agent:tool_pending` → `interrupt()` → `agent:resume:editor` event
 - Reader questions: `agent:question_pending` → `interrupt()` → `agent:resume:reader_questions` event
 
 Resume calls go through `graph.invoke(new Command({ resume: value }), config)` with the graph's thread ID.

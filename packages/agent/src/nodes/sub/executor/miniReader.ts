@@ -37,7 +37,7 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   }
 
   const findings = step.depends_on
-    .map((depId) => state.readerFindings[depId])
+    .map((depId) => state.key_findings[depId])
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
 
   // Files created/changed by EARLIER steps in this plan, excluding the ones this
@@ -50,9 +50,9 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   // conventions instead of inventing them.
   const loaded = new Set(files.map((f) => f.file));
   const toCreate = step.files.filter((f) => !loaded.has(f));
-  const references = (
-    await Promise.all(toCreate.map((f) => findReferenceFile(cwd, f)))
-  ).filter((r): r is { file: string; content: string } => r !== null);
+  const references = (await Promise.all(toCreate.map((f) => findReferenceFile(cwd, f)))).filter(
+    (r): r is { file: string; content: string } => r !== null
+  );
   // Dedupe references by path.
   const seenRef = new Set<string>();
   const uniqueReferences = references.filter((r) =>
@@ -112,16 +112,31 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
 
     if (output.status === 'noop') {
       // Step's intent already satisfied on disk — done, no edit, no retry.
-      return { currentHints: [], miniReaderStatus: 'noop' as const, lastError: null, userGuidance: null };
+      return {
+        currentHints: [],
+        miniReaderStatus: 'noop' as const,
+        lastError: null,
+        userGuidance: null,
+      };
     }
     if (output.status === 'blocked') {
       // Cannot proceed — surface reason and route to escalate (no retry burn).
       return { currentHints: [], miniReaderStatus: 'blocked' as const, lastError: output.reason };
     }
     // status === 'edits' — superRefine guarantees >= 1 hint.
-    return { currentHints: hints, miniReaderStatus: 'edits' as const, lastError: null, userGuidance: null, hintErrors: [] };
+    return {
+      currentHints: hints,
+      miniReaderStatus: 'edits' as const,
+      lastError: null,
+      userGuidance: null,
+      hintErrors: [],
+    };
   } catch (err) {
     debug('[executor/mini_reader] LLM failed', err);
-    return { currentHints: [], miniReaderStatus: 'blocked' as const, lastError: `mini_reader LLM error: ${String(err).slice(0, 500)}` };
+    return {
+      currentHints: [],
+      miniReaderStatus: 'blocked' as const,
+      lastError: `mini_reader LLM error: ${String(err).slice(0, 500)}`,
+    };
   }
 };

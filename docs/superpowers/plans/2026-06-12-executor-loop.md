@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript ESM monorepo (pnpm), LangGraph ^1.3.0, Zod, web-tree-sitter, Jest (`node --experimental-vm-modules node_modules/jest/bin/jest.js <file>`).
 
 **Conventions used below:**
+
 - All paths relative to repo root.
 - Tests live in `__tests__/agent/executor/`. Jest maps `@robocode-packages/*` → `packages/*/src`, so tests run against source.
 - Run a single test: `node --experimental-vm-modules node_modules/jest/bin/jest.js __tests__/agent/executor/<file>.test.ts`
@@ -20,6 +21,7 @@
 ### Task 1: Shared executor types, schema extensions, `runCommand`, `checkSyntax`
 
 **Files:**
+
 - Modify: `packages/shared/src/schemas/executor/types.ts`
 - Modify: `packages/shared/src/utils/shell.ts`
 - Create: `packages/shared/src/utils/editor/syntax.ts`
@@ -33,11 +35,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  ExecutorHintSchema,
-  runCommand,
-  checkSyntax,
-} from '@robocode-packages/shared';
+import { ExecutorHintSchema, runCommand, checkSyntax } from '@robocode-packages/shared';
 
 describe('ExecutorHintSchema extensions', () => {
   it('accepts rename_file with target', () => {
@@ -120,9 +118,16 @@ In `packages/shared/src/schemas/executor/types.ts`, add `target` and `insertMode
 ```typescript
 export const ExecutorHintSchema = z.object({
   op: z.enum([
-    'replace_node', 'insert_node', 'remove_node', 'rename_symbol',
-    'replace_text', 'insert_text', 'remove_text',
-    'create_file', 'delete_file', 'rename_file',
+    'replace_node',
+    'insert_node',
+    'remove_node',
+    'rename_symbol',
+    'replace_text',
+    'insert_text',
+    'remove_text',
+    'create_file',
+    'delete_file',
+    'rename_file',
   ]),
   file: z.string(),
   nodeType: z.string().nullable().optional(),
@@ -193,8 +198,7 @@ export const runCommand = async (
     return { ok: true, output: `${stdout}\n${stderr}`.trim() };
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; message?: string };
-    const output =
-      `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || String(e.message ?? err);
+    const output = `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || String(e.message ?? err);
     return { ok: false, output };
   }
 };
@@ -270,6 +274,7 @@ git commit -m "feat(shared): executor hint extensions, runCommand, checkSyntax"
 ### Task 2: Root state, context testRunner, executor events
 
 **Files:**
+
 - Modify: `packages/shared/src/state/root.ts`
 - Modify: `packages/shared/src/types/root/context.ts:111-118` (`WorkspaceContext.language`)
 - Modify: `packages/shared/src/helpers/context/utils.ts:297-310` (`cleanContext`)
@@ -400,6 +405,7 @@ git commit -m "feat(shared): root plan state, executor events, testRunner in con
 ### Task 3: ExecutorState + snapshot helpers
 
 **Files:**
+
 - Create: `packages/agent/src/subagents/executor/state.ts`
 - Create: `packages/agent/src/nodes/sub/executor/snapshots.ts`
 - Test: `__tests__/agent/executor/snapshots.test.ts`
@@ -464,24 +470,16 @@ import * as path from 'node:path';
 export type StepSnapshot = Record<string, string | null>;
 
 // Captures current content of repo-relative files. null = file did not exist.
-export const takeSnapshot = async (
-  cwd: string,
-  files: string[]
-): Promise<StepSnapshot> => {
+export const takeSnapshot = async (cwd: string, files: string[]): Promise<StepSnapshot> => {
   const snapshot: StepSnapshot = {};
   for (const file of [...new Set(files)]) {
-    snapshot[file] = await fs
-      .readFile(path.resolve(cwd, file), 'utf-8')
-      .catch(() => null);
+    snapshot[file] = await fs.readFile(path.resolve(cwd, file), 'utf-8').catch(() => null);
   }
   return snapshot;
 };
 
 // Restores files to snapshot state: null → delete, string → rewrite.
-export const restoreSnapshot = async (
-  cwd: string,
-  snapshot: StepSnapshot
-): Promise<void> => {
+export const restoreSnapshot = async (cwd: string, snapshot: StepSnapshot): Promise<void> => {
   for (const [file, content] of Object.entries(snapshot)) {
     const abs = path.resolve(cwd, file);
     if (content === null) {
@@ -537,10 +535,11 @@ export const ExecutorState = Annotation.Root({
   stepStates: Annotation<Record<string, StepStatus>>(mergeRecord<StepStatus>()),
   currentStepId: Annotation<string | null>(replace(() => null)),
   currentHints: Annotation<ExecutorHint[]>(replace(() => [] as ExecutorHint[])),
-  readerFindings: Annotation<Record<string, ReaderDigest>>(mergeRecord<ReaderDigest>()),
-  fileSnapshots: Annotation<Record<string, Record<string, string | null>>>(
-    mergeRecord<Record<string, string | null>>()
-  ),
+  key_findings: Annotation<Record<string, ReaderDigest>>(mergeRecord<ReaderDigest>()),
+  fileSnapshots:
+    Annotation<Record<string, Record<string, string | null>>>(
+      mergeRecord<Record<string, string | null>>()
+    ),
   retryCounts: Annotation<Record<string, number>>(mergeRecord<number>()),
   appliedOps: Annotation<Record<string, string[]>>(mergeRecord<string[]>()),
   lastError: Annotation<string | null>(replace(() => null)),
@@ -574,6 +573,7 @@ git commit -m "feat(agent): executor state and step snapshots"
 ### Task 4: `dispatchHint` — mechanical application of one hint
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/dispatch.ts`
 - Test: `__tests__/agent/executor/dispatch.test.ts`
 
@@ -588,8 +588,16 @@ import type { ExecutorHint } from '@robocode-packages/shared';
 import { dispatchHint } from '../../../packages/agent/src/nodes/sub/executor/dispatch';
 
 const hint = (partial: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, anchor: null, newContent: null,
-     target: null, insertMode: null, ...partial }) as ExecutorHint;
+  ({
+    nodeType: null,
+    symbol: null,
+    newSymbol: null,
+    anchor: null,
+    newContent: null,
+    target: null,
+    insertMode: null,
+    ...partial,
+  }) as ExecutorHint;
 
 describe('dispatchHint', () => {
   let dir: string;
@@ -608,7 +616,12 @@ describe('dispatchHint', () => {
 
   it('replace_text replaces a unique anchor', async () => {
     await dispatchHint(
-      hint({ op: 'replace_text', file: 'a.ts', anchor: 'return "hi";', newContent: 'return "hello";' }),
+      hint({
+        op: 'replace_text',
+        file: 'a.ts',
+        anchor: 'return "hi";',
+        newContent: 'return "hello";',
+      }),
       dir
     );
     expect(await read('a.ts')).toContain('return "hello";');
@@ -616,18 +629,18 @@ describe('dispatchHint', () => {
 
   it('replace_text fails on missing anchor with exact error', async () => {
     await expect(
-      dispatchHint(
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'nope', newContent: 'x' }),
-        dir
-      )
+      dispatchHint(hint({ op: 'replace_text', file: 'a.ts', anchor: 'nope', newContent: 'x' }), dir)
     ).rejects.toThrow(/Target not found/);
   });
 
   it('insert_text inserts after anchor', async () => {
     await dispatchHint(
       hint({
-        op: 'insert_text', file: 'a.ts', anchor: 'export const greet = () => {',
-        insertMode: 'after', newContent: '\n  // inserted',
+        op: 'insert_text',
+        file: 'a.ts',
+        anchor: 'export const greet = () => {',
+        insertMode: 'after',
+        newContent: '\n  // inserted',
       }),
       dir
     );
@@ -635,18 +648,18 @@ describe('dispatchHint', () => {
   });
 
   it('remove_text removes the anchor', async () => {
-    await dispatchHint(
-      hint({ op: 'remove_text', file: 'a.ts', anchor: '  return "hi";\n' }),
-      dir
-    );
+    await dispatchHint(hint({ op: 'remove_text', file: 'a.ts', anchor: '  return "hi";\n' }), dir);
     expect(await read('a.ts')).not.toContain('return "hi"');
   });
 
   it('rename_symbol renames via AST', async () => {
     await dispatchHint(
       hint({
-        op: 'rename_symbol', file: 'a.ts',
-        nodeType: 'variable_declarator', symbol: 'greet', newSymbol: 'salute',
+        op: 'rename_symbol',
+        file: 'a.ts',
+        nodeType: 'variable_declarator',
+        symbol: 'greet',
+        newSymbol: 'salute',
       }),
       dir
     );
@@ -680,7 +693,12 @@ describe('dispatchHint', () => {
   it('fails when an edit produces broken syntax', async () => {
     await expect(
       dispatchHint(
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'return "hi";', newContent: 'return {{{;' }),
+        hint({
+          op: 'replace_text',
+          file: 'a.ts',
+          anchor: 'return "hi";',
+          newContent: 'return {{{;',
+        }),
         dir
       )
     ).rejects.toThrow(/Syntax error/);
@@ -768,10 +786,7 @@ const writeAndCheck = async (abs: string, file: string, content: string): Promis
 // Applies one hint mechanically. Reads the file fresh from disk (previous hints
 // in the same step may have shifted content). Throws with an exact, actionable
 // message on any failure — the caller routes failures into the retry path.
-export const dispatchHint = async (
-  hint: ExecutorHint,
-  cwd: string
-): Promise<DispatchResult> => {
+export const dispatchHint = async (hint: ExecutorHint, cwd: string): Promise<DispatchResult> => {
   const op = hint.op;
 
   // ── file-level ops (no content read) ────────────────────────────────────────
@@ -779,7 +794,11 @@ export const dispatchHint = async (
     resolveInside(cwd, hint.file);
     const content = require_(hint.newContent, 'newContent', op);
     const { absPath } = await applyFileInsert(cwd, {
-      mode: 'file', action: 'insert', file: hint.file, insertText: content, reasoning: '',
+      mode: 'file',
+      action: 'insert',
+      file: hint.file,
+      insertText: content,
+      reasoning: '',
     });
     const syntax = await checkSyntax(absPath, content);
     if (!syntax.ok) throw new Error(syntax.error);
@@ -797,7 +816,11 @@ export const dispatchHint = async (
     const target = require_(hint.target, 'target', op);
     resolveInside(cwd, target);
     await applyFileRename(cwd, {
-      mode: 'file', action: 'rename', file: hint.file, target, reasoning: '',
+      mode: 'file',
+      action: 'rename',
+      file: hint.file,
+      target,
+      reasoning: '',
     });
     return { file: target, summary: `rename_file ${hint.file} → ${target}` };
   }
@@ -813,7 +836,9 @@ export const dispatchHint = async (
   if (op === 'replace_text') {
     const anchor = require_(hint.anchor, 'anchor', op);
     next = applyTextReplace(content, {
-      mode: 'text', action: 'replace', file: hint.file,
+      mode: 'text',
+      action: 'replace',
+      file: hint.file,
       anchor: { type: 'exact', value: anchor },
       replaceWith: require_(hint.newContent, 'newContent', op),
       reasoning: '',
@@ -825,7 +850,9 @@ export const dispatchHint = async (
         ? (hint.anchor ?? '')
         : require_(hint.anchor, 'anchor', op);
     next = applyTextInsert(content, {
-      mode: 'text', action: 'insert', file: hint.file,
+      mode: 'text',
+      action: 'insert',
+      file: hint.file,
       anchor: { type: 'exact', value: anchor },
       insertMode,
       insertText: require_(hint.newContent, 'newContent', op),
@@ -834,7 +861,9 @@ export const dispatchHint = async (
   } else if (op === 'remove_text') {
     const anchor = require_(hint.anchor, 'anchor', op);
     next = applyTextDelete(content, {
-      mode: 'text', action: 'remove', file: hint.file,
+      mode: 'text',
+      action: 'remove',
+      file: hint.file,
       anchor: { type: 'exact', value: anchor },
       target: anchor,
       reasoning: '',
@@ -884,6 +913,7 @@ git commit -m "feat(agent): executor hint dispatch with syntax tier"
 ### Task 5: `init` node + related-test-file heuristic
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/init.ts`
 - Create: `packages/agent/src/nodes/sub/executor/relatedTest.ts`
 - Test: `__tests__/agent/executor/init.test.ts`
@@ -900,43 +930,97 @@ import { findRelatedTestFile } from '../../../packages/agent/src/nodes/sub/execu
 import type { ExecutorStateType } from '../../../packages/agent/src/subagents/executor/state';
 
 const basePlan = {
-  goal: 'g', clarifying_questions: [], risk: 'low' as const,
-  assumptions: [], constraints: [], files_affected: ['src/a.ts'], gitStep: null,
+  goal: 'g',
+  clarifying_questions: [],
+  risk: 'low' as const,
+  assumptions: [],
+  constraints: [],
+  files_affected: ['src/a.ts'],
+  gitStep: null,
   steps: [
-    { id: 'inspect-a', kind: 'inspect' as const, title: 't', files: ['src/a.ts'], depends_on: [], expected_output: 'e' },
-    { id: 'edit-a', kind: 'edit' as const, title: 't', files: ['src/a.ts'], depends_on: ['inspect-a'], expected_output: 'e' },
+    {
+      id: 'inspect-a',
+      kind: 'inspect' as const,
+      title: 't',
+      files: ['src/a.ts'],
+      depends_on: [],
+      expected_output: 'e',
+    },
+    {
+      id: 'edit-a',
+      kind: 'edit' as const,
+      title: 't',
+      files: ['src/a.ts'],
+      depends_on: ['inspect-a'],
+      expected_output: 'e',
+    },
   ],
 };
 
 const state = (overrides: Partial<ExecutorStateType>): ExecutorStateType =>
-  ({ plan: basePlan, context: null, cwd: '/tmp', sessionId: 's',
-     stepResults: [], stepStates: {}, currentStepId: null, currentHints: [],
-     readerFindings: {}, fileSnapshots: {}, retryCounts: {}, appliedOps: {},
-     lastError: null, userGuidance: null, verifyOutput: null, escalationDecision: null,
-     verifyCommands: { typeCheck: null, testRunner: null, lint: null },
-     ...overrides }) as ExecutorStateType;
+  ({
+    plan: basePlan,
+    context: null,
+    cwd: '/tmp',
+    sessionId: 's',
+    stepResults: [],
+    stepStates: {},
+    currentStepId: null,
+    currentHints: [],
+    key_findings: {},
+    fileSnapshots: {},
+    retryCounts: {},
+    appliedOps: {},
+    lastError: null,
+    userGuidance: null,
+    verifyOutput: null,
+    escalationDecision: null,
+    verifyCommands: { typeCheck: null, testRunner: null, lint: null },
+    ...overrides,
+  }) as ExecutorStateType;
 
 describe('initNode', () => {
   it('marks all steps pending and derives verify commands from context', async () => {
     const res = await initNode(
       state({
         context: {
-          cwd: '/tmp', git: {}, project: { name: 'p', frameworks: [] },
-          structure: [], entryPoints: [],
+          cwd: '/tmp',
+          git: {},
+          project: { name: 'p', frameworks: [] },
+          structure: [],
+          entryPoints: [],
           language: { primary: 'typescript', typeCheck: 'tsc --noEmit', testRunner: 'jest' },
         },
       })
     );
     expect(res.stepStates).toEqual({ 'inspect-a': 'pending', 'edit-a': 'pending' });
-    expect(res.verifyCommands).toEqual({ typeCheck: 'tsc --noEmit', testRunner: 'jest', lint: null });
+    expect(res.verifyCommands).toEqual({
+      typeCheck: 'tsc --noEmit',
+      testRunner: 'jest',
+      lint: null,
+    });
   });
 
   it('fails fast on a dependency cycle', async () => {
     const cyclic = {
       ...basePlan,
       steps: [
-        { id: 'edit-a', kind: 'edit' as const, title: 't', files: ['src/a.ts'], depends_on: ['edit-b'], expected_output: 'e' },
-        { id: 'edit-b', kind: 'edit' as const, title: 't', files: ['src/a.ts'], depends_on: ['edit-a'], expected_output: 'e' },
+        {
+          id: 'edit-a',
+          kind: 'edit' as const,
+          title: 't',
+          files: ['src/a.ts'],
+          depends_on: ['edit-b'],
+          expected_output: 'e',
+        },
+        {
+          id: 'edit-b',
+          kind: 'edit' as const,
+          title: 't',
+          files: ['src/a.ts'],
+          depends_on: ['edit-a'],
+          expected_output: 'e',
+        },
       ],
     };
     const res = await initNode(state({ plan: cyclic }));
@@ -1078,6 +1162,7 @@ git commit -m "feat(agent): executor init node and related-test heuristic"
 ### Task 6: `step_selector` node
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/stepSelector.ts`
 - Test: `__tests__/agent/executor/stepSelector.test.ts`
 
@@ -1091,8 +1176,11 @@ import {
 } from '../../../packages/agent/src/nodes/sub/executor/stepSelector';
 import type { PlanStep, StepStatus } from '@robocode-packages/shared';
 
-const step = (id: string, depends_on: string[] = [], kind: PlanStep['kind'] = 'edit'): PlanStep =>
-  ({ id, kind, title: id, files: ['src/a.ts'], depends_on, expected_output: 'e' });
+const step = (
+  id: string,
+  depends_on: string[] = [],
+  kind: PlanStep['kind'] = 'edit'
+): PlanStep => ({ id, kind, title: id, files: ['src/a.ts'], depends_on, expected_output: 'e' });
 
 describe('pickNextStep', () => {
   it('respects depends_on order', () => {
@@ -1117,13 +1205,21 @@ describe('pickNextStep', () => {
 describe('stepSelectorNode', () => {
   it('marks unreachable pending steps skipped and records results', async () => {
     const plan = {
-      goal: 'g', clarifying_questions: [], risk: 'low' as const, assumptions: [],
-      constraints: [], files_affected: [], gitStep: null,
+      goal: 'g',
+      clarifying_questions: [],
+      risk: 'low' as const,
+      assumptions: [],
+      constraints: [],
+      files_affected: [],
+      gitStep: null,
       steps: [step('a', [], 'inspect'), step('b', ['a'])],
     };
     const res = await stepSelectorNode({
-      plan, sessionId: 's', stepStates: { a: 'failed', b: 'pending' },
-      retryCounts: {}, stepResults: [],
+      plan,
+      sessionId: 's',
+      stepStates: { a: 'failed', b: 'pending' },
+      retryCounts: {},
+      stepResults: [],
     } as never);
     expect(res.currentStepId).toBeNull();
     expect(res.stepStates).toMatchObject({ b: 'skipped' });
@@ -1166,7 +1262,11 @@ export const stepSelectorNode = async (state: ExecutorStateType) => {
     const total = plan.steps.length;
     const index = plan.steps.findIndex((s) => s.id === next.id) + 1;
     EventBus.emit('executor:step:start', {
-      sessionId, stepId: next.id, title: next.title, index, total,
+      sessionId,
+      stepId: next.id,
+      title: next.title,
+      index,
+      total,
     });
     debug('[executor/select]', next.id, `(${index}/${total})`);
     return {
@@ -1193,7 +1293,9 @@ export const stepSelectorNode = async (state: ExecutorStateType) => {
       retries: state.retryCounts[step.id] ?? 0,
     });
     EventBus.emit('executor:step:done', {
-      sessionId, stepId: step.id, status: 'skipped',
+      sessionId,
+      stepId: step.id,
+      status: 'skipped',
       retries: state.retryCounts[step.id] ?? 0,
     });
   }
@@ -1216,6 +1318,7 @@ git commit -m "feat(agent): executor step selector with unreachable-step skip"
 ### Task 7: mini-reader prompt + node
 
 **Files:**
+
 - Create: `packages/agent/src/prompts/sub/executor/miniReader.ts`
 - Create: `packages/agent/src/nodes/sub/executor/miniReader.ts`
 - Test: `__tests__/agent/executor/miniReaderPrompt.test.ts`
@@ -1227,8 +1330,12 @@ git commit -m "feat(agent): executor step selector with unreachable-step skip"
 import { buildMiniReaderPrompt } from '../../../packages/agent/src/prompts/sub/executor/miniReader';
 
 const step = {
-  id: 'edit-a', kind: 'edit' as const, title: 'Add salute()', files: ['src/a.ts'],
-  depends_on: ['inspect-a'], expected_output: 'salute exported; tsc clean',
+  id: 'edit-a',
+  kind: 'edit' as const,
+  title: 'Add salute()',
+  files: ['src/a.ts'],
+  depends_on: ['inspect-a'],
+  expected_output: 'salute exported; tsc clean',
 };
 
 describe('buildMiniReaderPrompt', () => {
@@ -1238,7 +1345,14 @@ describe('buildMiniReaderPrompt', () => {
       goal: 'Add greeting feature',
       constraints: ['do not change public API'],
       files: [{ file: 'src/a.ts', content: 'line one\nline two' }],
-      findings: [{ stepId: 'inspect-a', summary: 'a.ts exports greet()', keyFindings: [], operationHints: [] }],
+      findings: [
+        {
+          stepId: 'inspect-a',
+          summary: 'a.ts exports greet()',
+          keyFindings: [],
+          operationHints: [],
+        },
+      ],
       lastError: null,
       userGuidance: null,
       appliedOps: [],
@@ -1253,7 +1367,11 @@ describe('buildMiniReaderPrompt', () => {
 
   it('includes retry context when lastError is present', () => {
     const prompt = buildMiniReaderPrompt({
-      step, goal: 'g', constraints: [], files: [], findings: [],
+      step,
+      goal: 'g',
+      constraints: [],
+      files: [],
+      findings: [],
       lastError: 'Type check failed: error TS2304',
       userGuidance: 'use the existing helper',
       appliedOps: ['replace_text src/a.ts'],
@@ -1391,7 +1509,7 @@ export const miniReaderNode = async (state: ExecutorStateType) => {
   ).filter((f): f is { file: string; content: string } => f !== null);
 
   const findings = step.depends_on
-    .map((depId) => state.readerFindings[depId])
+    .map((depId) => state.key_findings[depId])
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
 
   const prompt = buildMiniReaderPrompt({
@@ -1442,6 +1560,7 @@ git commit -m "feat(agent): executor mini-reader prompt and node"
 ### Task 8: `approval_gate` and `apply` nodes
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/approvalGate.ts`
 - Create: `packages/agent/src/nodes/sub/executor/apply.ts`
 - Test: `__tests__/agent/executor/apply.test.ts`
@@ -1458,17 +1577,37 @@ import type { ExecutorHint } from '@robocode-packages/shared';
 
 const mkState = (cwd: string, hints: ExecutorHint[], extra: Record<string, unknown> = {}) =>
   ({
-    plan: null, context: null, cwd, sessionId: 's', stepResults: [],
-    stepStates: {}, currentStepId: 'edit-a', currentHints: hints,
-    readerFindings: {}, fileSnapshots: {}, retryCounts: {}, appliedOps: {},
-    lastError: null, userGuidance: null, verifyOutput: null, escalationDecision: null,
+    plan: null,
+    context: null,
+    cwd,
+    sessionId: 's',
+    stepResults: [],
+    stepStates: {},
+    currentStepId: 'edit-a',
+    currentHints: hints,
+    key_findings: {},
+    fileSnapshots: {},
+    retryCounts: {},
+    appliedOps: {},
+    lastError: null,
+    userGuidance: null,
+    verifyOutput: null,
+    escalationDecision: null,
     verifyCommands: { typeCheck: null, testRunner: null, lint: null },
     ...extra,
   }) as never;
 
 const hint = (partial: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, anchor: null, newContent: null,
-     target: null, insertMode: null, ...partial }) as ExecutorHint;
+  ({
+    nodeType: null,
+    symbol: null,
+    newSymbol: null,
+    anchor: null,
+    newContent: null,
+    target: null,
+    insertMode: null,
+    ...partial,
+  }) as ExecutorHint;
 
 describe('applyNode', () => {
   let dir: string;
@@ -1481,8 +1620,19 @@ describe('applyNode', () => {
   it('snapshots target files, applies all hints in order, records appliedOps', async () => {
     const res = await applyNode(
       mkState(dir, [
-        hint({ op: 'replace_text', file: 'a.ts', anchor: 'const a = 1;', newContent: 'const a = 2;' }),
-        hint({ op: 'insert_text', file: 'a.ts', anchor: 'const a = 2;', insertMode: 'after', newContent: '\nconst b = 3;' }),
+        hint({
+          op: 'replace_text',
+          file: 'a.ts',
+          anchor: 'const a = 1;',
+          newContent: 'const a = 2;',
+        }),
+        hint({
+          op: 'insert_text',
+          file: 'a.ts',
+          anchor: 'const a = 2;',
+          insertMode: 'after',
+          newContent: '\nconst b = 3;',
+        }),
       ])
     );
     expect(res.lastError).toBeNull();
@@ -1496,7 +1646,14 @@ describe('applyNode', () => {
     const res = await applyNode(
       mkState(
         dir,
-        [hint({ op: 'replace_text', file: 'a.ts', anchor: 'const a = 1;', newContent: 'const a = 5;' })],
+        [
+          hint({
+            op: 'replace_text',
+            file: 'a.ts',
+            anchor: 'const a = 1;',
+            newContent: 'const a = 5;',
+          }),
+        ],
         { fileSnapshots: { 'edit-a': { 'a.ts': 'PRISTINE' } } }
       )
     );
@@ -1545,9 +1702,7 @@ export const approvalGateNode = (state: ExecutorStateType) => {
     toolCall: { name: 'delete_file', input: { files: targets } },
   });
 
-  const decision: string = interrupt(
-    `Executor wants to delete: ${targets.join(', ')}. Approve?`
-  );
+  const decision: string = interrupt(`Executor wants to delete: ${targets.join(', ')}. Approve?`);
   const approved = decision === 'approve' || decision === 'y';
 
   EventBus.emit('agent:tool_decision', {
@@ -1574,7 +1729,11 @@ import type { ExecutorStateType } from '../../../subagents/executor/state';
 import { dispatchHint } from './dispatch';
 import { takeSnapshot } from './snapshots';
 
-const hintDiff = (op: string, anchor: string | null | undefined, newContent: string | null | undefined): string => {
+const hintDiff = (
+  op: string,
+  anchor: string | null | undefined,
+  newContent: string | null | undefined
+): string => {
   const removed = anchor ? `- ${anchor.slice(0, 200)}` : '';
   const added = newContent ? `+ ${newContent.slice(0, 400)}` : '';
   return [removed, added].filter(Boolean).join('\n') || op;
@@ -1643,6 +1802,7 @@ git commit -m "feat(agent): executor approval gate and apply nodes"
 ### Task 9: `verify_step` node
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/verifyStep.ts`
 - Test: `__tests__/agent/executor/verifyStep.test.ts`
 
@@ -1655,17 +1815,39 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { verifyStepNode } from '../../../packages/agent/src/nodes/sub/executor/verifyStep';
 
-const mkState = (cwd: string, verifyCommands: Record<string, string | null>, files = ['src/a.ts']) =>
+const mkState = (
+  cwd: string,
+  verifyCommands: Record<string, string | null>,
+  files = ['src/a.ts']
+) =>
   ({
     plan: {
-      goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
-      files_affected: files, gitStep: null,
-      steps: [{ id: 'edit-a', kind: 'edit', title: 't', files, depends_on: [], expected_output: 'e' }],
+      goal: 'g',
+      clarifying_questions: [],
+      risk: 'low',
+      assumptions: [],
+      constraints: [],
+      files_affected: files,
+      gitStep: null,
+      steps: [
+        { id: 'edit-a', kind: 'edit', title: 't', files, depends_on: [], expected_output: 'e' },
+      ],
     },
-    context: null, cwd, sessionId: 's', stepResults: [], stepStates: {},
-    currentStepId: 'edit-a', currentHints: [], readerFindings: {}, fileSnapshots: {},
-    retryCounts: {}, appliedOps: {}, lastError: null, userGuidance: null,
-    verifyOutput: null, escalationDecision: null,
+    context: null,
+    cwd,
+    sessionId: 's',
+    stepResults: [],
+    stepStates: {},
+    currentStepId: 'edit-a',
+    currentHints: [],
+    key_findings: {},
+    fileSnapshots: {},
+    retryCounts: {},
+    appliedOps: {},
+    lastError: null,
+    userGuidance: null,
+    verifyOutput: null,
+    escalationDecision: null,
     verifyCommands: { typeCheck: null, testRunner: null, lint: null, ...verifyCommands },
   }) as never;
 
@@ -1685,7 +1867,9 @@ describe('verifyStepNode', () => {
 
   it('fails with output tail when typeCheck fails', async () => {
     const res = await verifyStepNode(
-      mkState(dir, { typeCheck: 'node -e "console.error(\'error TS2304: boom\'); process.exit(1)"' })
+      mkState(dir, {
+        typeCheck: 'node -e "console.error(\'error TS2304: boom\'); process.exit(1)"',
+      })
     );
     expect(res.lastError).toMatch(/Type check failed/);
     expect(res.verifyOutput).toContain('TS2304');
@@ -1736,7 +1920,10 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
     const result = await runCommand(verifyCommands.typeCheck, cwd);
     const failed = !result.ok || /error TS\d+|error\[|error:/.test(result.output);
     EventBus.emit('executor:step:verify', {
-      sessionId, stepId: currentStepId, command: verifyCommands.typeCheck, ok: !failed,
+      sessionId,
+      stepId: currentStepId,
+      command: verifyCommands.typeCheck,
+      ok: !failed,
     });
     if (failed) {
       debug('[executor/verify] typeCheck failed');
@@ -1755,7 +1942,10 @@ export const verifyStepNode = async (state: ExecutorStateType) => {
       const cmd = `${verifyCommands.testRunner} ${testFile}`;
       const result = await runCommand(cmd, cwd);
       EventBus.emit('executor:step:verify', {
-        sessionId, stepId: currentStepId, command: cmd, ok: result.ok,
+        sessionId,
+        stepId: currentStepId,
+        command: cmd,
+        ok: result.ok,
       });
       if (!result.ok) {
         debug('[executor/verify] tests failed for', testFile);
@@ -1787,6 +1977,7 @@ git commit -m "feat(agent): executor step verification node"
 ### Task 10: `step_review` node (LLM judge + transition logic + rollback)
 
 **Files:**
+
 - Create: `packages/agent/src/prompts/sub/executor/stepReview.ts`
 - Create: `packages/agent/src/nodes/sub/executor/stepReview.ts`
 - Test: `__tests__/agent/executor/stepReview.test.ts`
@@ -1833,7 +2024,9 @@ export interface StepReviewPromptInput {
   verifyOutput: string | null;
 }
 
-export const buildStepReviewPrompt = (input: StepReviewPromptInput): string => `You are the reviewer inside a code-editing loop. One plan step was just executed and verified. Decide if its result satisfies the expected output.
+export const buildStepReviewPrompt = (
+  input: StepReviewPromptInput
+): string => `You are the reviewer inside a code-editing loop. One plan step was just executed and verified. Decide if its result satisfies the expected output.
 
 ## Step
 ${input.stepTitle}
@@ -1870,10 +2063,7 @@ import type { ExecutorStateType } from '../../../subagents/executor/state';
 
 export type StepOutcome = 'done' | 'retry' | 'failed';
 
-export const decideStepOutcome = (
-  status: StepReviewStatus,
-  retries: number
-): StepOutcome => {
+export const decideStepOutcome = (status: StepReviewStatus, retries: number): StepOutcome => {
   if (status === 'sufficient') return 'done';
   if (status === 'blocked') return 'failed';
   return retries < MAX_STEP_RETRIES ? 'retry' : 'failed';
@@ -1930,7 +2120,12 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
       output: reason.slice(0, 800),
       retries,
     };
-    EventBus.emit('executor:step:done', { sessionId, stepId: currentStepId, status: 'done', retries });
+    EventBus.emit('executor:step:done', {
+      sessionId,
+      stepId: currentStepId,
+      status: 'done',
+      retries,
+    });
     return {
       stepStates: { [currentStepId]: 'done' as const },
       stepResults: [result],
@@ -1959,7 +2154,12 @@ export const stepReviewNode = async (state: ExecutorStateType) => {
     output: reason.slice(0, 800),
     retries,
   };
-  EventBus.emit('executor:step:done', { sessionId, stepId: currentStepId, status: 'failed', retries });
+  EventBus.emit('executor:step:done', {
+    sessionId,
+    stepId: currentStepId,
+    status: 'failed',
+    retries,
+  });
   return {
     stepStates: { [currentStepId]: 'failed' as const },
     stepResults: [result],
@@ -1985,6 +2185,7 @@ git commit -m "feat(agent): executor step review with retry rollback"
 ### Task 11: `reader_step`, `escalate`, `finalize` nodes
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/sub/executor/readerStep.ts`
 - Create: `packages/agent/src/nodes/sub/executor/escalate.ts`
 - Create: `packages/agent/src/nodes/sub/executor/finalize.ts`
@@ -2034,16 +2235,40 @@ describe('collectDependents', () => {
 describe('digestReaderOutput', () => {
   it('clips findings and extracts hints', () => {
     const digest = digestReaderOutput('inspect-a', {
-      schemaVersion: 'reader.output.v2', status: 'sufficient',
-      summary: 'S', language: 'typescript', filesAnalyzed: ['src/a.ts'],
-      functions: [], classes: [], imports: [], references: [], unresolvedQuestions: [],
+      schemaVersion: 'reader.output.v2',
+      status: 'sufficient',
+      summary: 'S',
+      language: 'typescript',
+      files_analyzed: ['src/a.ts'],
+      functions: [],
+      classes: [],
+      imports: [],
+      references: [],
+      unresolved_questions: [],
       key_findings: Array.from({ length: 30 }, (_, i) => ({
-        file: 'src/a.ts', lines: String(i), content: 'x'.repeat(2000), comment: `c${i}`,
+        file: 'src/a.ts',
+        lines: String(i),
+        content: 'x'.repeat(2000),
+        comment: `c${i}`,
       })),
       potential_edit_strategy: {
-        goal: 'g', files_to_modify: ['src/a.ts'], change_type: 'modify',
-        instructions: 'i', constraints: [],
-        operation_hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'x', details: 'd', lines: '', nodeType: null, symbol: null, newSymbol: null }],
+        goal: 'g',
+        files_to_modify: ['src/a.ts'],
+        change_type: 'modify',
+        instructions: 'i',
+        constraints: [],
+        operation_hints: [
+          {
+            op: 'replace_text',
+            file: 'src/a.ts',
+            anchor: 'x',
+            details: 'd',
+            lines: '',
+            nodeType: null,
+            symbol: null,
+            newSymbol: null,
+          },
+        ],
       },
     } as never);
     expect(digest.stepId).toBe('inspect-a');
@@ -2115,10 +2340,20 @@ export const readerStepNode = async (state: ExecutorStateType) => {
 
   if (!output || output.status === 'blocked') {
     const reason = output
-      ? `Reader blocked: ${output.unresolvedQuestions.join('; ') || output.summary}`
+      ? `Reader blocked: ${output.unresolved_questions.join('; ') || output.summary}`
       : 'Reader subagent returned no output.';
-    EventBus.emit('executor:step:done', { sessionId, stepId: currentStepId, status: 'failed', retries });
-    const result: StepResult = { stepId: currentStepId, status: 'failed', output: reason.slice(0, 800), retries };
+    EventBus.emit('executor:step:done', {
+      sessionId,
+      stepId: currentStepId,
+      status: 'failed',
+      retries,
+    });
+    const result: StepResult = {
+      stepId: currentStepId,
+      status: 'failed',
+      output: reason.slice(0, 800),
+      retries,
+    };
     return {
       stepStates: { [currentStepId]: 'failed' as const },
       stepResults: [result],
@@ -2129,7 +2364,12 @@ export const readerStepNode = async (state: ExecutorStateType) => {
   // 'sufficient' and 'insufficient' both produce usable findings; unresolved
   // questions surface to the mini-reader through the digest summary.
   const digest = digestReaderOutput(currentStepId, output);
-  EventBus.emit('executor:step:done', { sessionId, stepId: currentStepId, status: 'done', retries });
+  EventBus.emit('executor:step:done', {
+    sessionId,
+    stepId: currentStepId,
+    status: 'done',
+    retries,
+  });
   const result: StepResult = {
     stepId: currentStepId,
     status: 'done',
@@ -2137,7 +2377,7 @@ export const readerStepNode = async (state: ExecutorStateType) => {
     retries,
   };
   return {
-    readerFindings: { [currentStepId]: digest },
+    key_findings: { [currentStepId]: digest },
     stepStates: { [currentStepId]: 'done' as const },
     stepResults: [result],
     currentStepId: null,
@@ -2226,7 +2466,8 @@ export const escalateNode = (state: ExecutorStateType) => {
     for (const id of cascade) {
       stepStates[id] = 'skipped';
       stepResults.push({
-        stepId: id, status: 'skipped',
+        stepId: id,
+        status: 'skipped',
         output: `Skipped: dependency "${stepId}" was skipped by the user.`,
         retries: 0,
       });
@@ -2312,6 +2553,7 @@ git commit -m "feat(agent): executor reader step, escalation, finalize nodes"
 ### Task 12: Executor graph assembly + integration test
 
 **Files:**
+
 - Create: `packages/agent/src/subagents/executor/graph.ts`
 - Create: `packages/agent/src/subagents/executor/index.ts`
 - Modify: `packages/agent/src/subagents/index.ts`
@@ -2391,30 +2633,42 @@ export function createExecutorGraph() {
 
     .addEdge(START, 'init')
     .addConditionalEdges('init', afterInit, {
-      step_selector: 'step_selector', finalize: 'finalize',
+      step_selector: 'step_selector',
+      finalize: 'finalize',
     })
     .addConditionalEdges('step_selector', afterSelector, {
-      reader_step: 'reader_step', mini_reader: 'mini_reader', finalize: 'finalize',
+      reader_step: 'reader_step',
+      mini_reader: 'mini_reader',
+      finalize: 'finalize',
     })
     .addConditionalEdges('reader_step', afterReaderStep, {
-      escalate: 'escalate', step_selector: 'step_selector',
+      escalate: 'escalate',
+      step_selector: 'step_selector',
     })
     .addConditionalEdges('mini_reader', afterMiniReader, {
-      approval_gate: 'approval_gate', apply: 'apply', step_review: 'step_review',
+      approval_gate: 'approval_gate',
+      apply: 'apply',
+      step_review: 'step_review',
     })
     .addConditionalEdges('approval_gate', afterApprovalGate, {
-      step_review: 'step_review', apply: 'apply',
+      step_review: 'step_review',
+      apply: 'apply',
     })
     .addConditionalEdges('apply', afterApply, {
-      step_review: 'step_review', verify_step: 'verify_step',
+      step_review: 'step_review',
+      verify_step: 'verify_step',
     })
     .addEdge('verify_step', 'step_review')
     .addConditionalEdges('step_review', afterReview, {
-      step_selector: 'step_selector', escalate: 'escalate', mini_reader: 'mini_reader',
+      step_selector: 'step_selector',
+      escalate: 'escalate',
+      mini_reader: 'mini_reader',
     })
     .addConditionalEdges('escalate', afterEscalate, {
-      finalize: 'finalize', step_selector: 'step_selector',
-      reader_step: 'reader_step', mini_reader: 'mini_reader',
+      finalize: 'finalize',
+      step_selector: 'step_selector',
+      reader_step: 'reader_step',
+      mini_reader: 'mini_reader',
     })
     .addEdge('finalize', END);
 
@@ -2460,13 +2714,18 @@ jest.unstable_mockModule('../../../packages/agent/src/utils/model', () => ({
   })),
 }));
 
-const { createExecutorGraph } = await import(
-  '../../../packages/agent/src/subagents/executor/graph'
-);
+const { createExecutorGraph } =
+  await import('../../../packages/agent/src/subagents/executor/graph');
 
 const plan = (steps: unknown[]) => ({
-  goal: 'test goal', clarifying_questions: [], risk: 'low', assumptions: [],
-  constraints: [], files_affected: ['src/a.ts'], gitStep: null, steps,
+  goal: 'test goal',
+  clarifying_questions: [],
+  risk: 'low',
+  assumptions: [],
+  constraints: [],
+  files_affected: ['src/a.ts'],
+  gitStep: null,
+  steps,
 });
 
 describe('executor graph (mocked LLM)', () => {
@@ -2482,7 +2741,16 @@ describe('executor graph (mocked LLM)', () => {
   it('happy path: edit step applies hints, reviews sufficient, finishes done', async () => {
     llmQueue.push(
       // mini_reader output
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 2;' }] },
+      {
+        hints: [
+          {
+            op: 'replace_text',
+            file: 'src/a.ts',
+            anchor: 'export const a = 1;',
+            newContent: 'export const a = 2;',
+          },
+        ],
+      },
       // step_review output
       { status: 'sufficient', reason: 'value updated' }
     );
@@ -2490,9 +2758,18 @@ describe('executor graph (mocked LLM)', () => {
     const graph = createExecutorGraph();
     const result = await graph.invoke({
       plan: plan([
-        { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'a === 2' },
+        {
+          id: 'edit-a',
+          kind: 'edit',
+          title: 'bump a',
+          files: ['src/a.ts'],
+          depends_on: [],
+          expected_output: 'a === 2',
+        },
       ]),
-      context: null, cwd: dir, sessionId: 's',
+      context: null,
+      cwd: dir,
+      sessionId: 's',
     });
 
     expect(result.stepResults).toHaveLength(1);
@@ -2502,17 +2779,37 @@ describe('executor graph (mocked LLM)', () => {
 
   it('retry path: bad anchor rolls back, second attempt succeeds', async () => {
     llmQueue.push(
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG ANCHOR', newContent: 'x' }] }, // attempt 1 → apply fails
-      { hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'export const a = 1;', newContent: 'export const a = 3;' }] }, // attempt 2
+      {
+        hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG ANCHOR', newContent: 'x' }],
+      }, // attempt 1 → apply fails
+      {
+        hints: [
+          {
+            op: 'replace_text',
+            file: 'src/a.ts',
+            anchor: 'export const a = 1;',
+            newContent: 'export const a = 3;',
+          },
+        ],
+      }, // attempt 2
       { status: 'sufficient', reason: 'ok' } // review of attempt 2
     );
 
     const graph = createExecutorGraph();
     const result = await graph.invoke({
       plan: plan([
-        { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'a === 3' },
+        {
+          id: 'edit-a',
+          kind: 'edit',
+          title: 'bump a',
+          files: ['src/a.ts'],
+          depends_on: [],
+          expected_output: 'a === 3',
+        },
       ]),
-      context: null, cwd: dir, sessionId: 's',
+      context: null,
+      cwd: dir,
+      sessionId: 's',
     });
 
     expect(result.stepResults[0]).toMatchObject({ stepId: 'edit-a', status: 'done', retries: 1 });
@@ -2522,7 +2819,9 @@ describe('executor graph (mocked LLM)', () => {
   it('exhausted retries roll files back and escalate via interrupt', async () => {
     // 3 failing attempts (initial + 2 retries), each consumes one mini_reader output
     for (let i = 0; i < 3; i++) {
-      llmQueue.push({ hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }] });
+      llmQueue.push({
+        hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'WRONG', newContent: 'x' }],
+      });
     }
 
     // Without a checkpointer, interrupt() in the escalate node throws GraphInterrupt
@@ -2530,9 +2829,18 @@ describe('executor graph (mocked LLM)', () => {
     await expect(
       createExecutorGraph().invoke({
         plan: plan([
-          { id: 'edit-a', kind: 'edit', title: 'bump a', files: ['src/a.ts'], depends_on: [], expected_output: 'x' },
+          {
+            id: 'edit-a',
+            kind: 'edit',
+            title: 'bump a',
+            files: ['src/a.ts'],
+            depends_on: [],
+            expected_output: 'x',
+          },
         ]),
-        context: null, cwd: dir, sessionId: 's',
+        context: null,
+        cwd: dir,
+        sessionId: 's',
       })
     ).rejects.toThrow();
 
@@ -2548,6 +2856,7 @@ Note for the implementer: this test asserts only that (a) the escalation interru
 
 Run: `node --experimental-vm-modules node_modules/jest/bin/jest.js __tests__/agent/executor/graph.test.ts`
 Expected: PASS (3 tests). Likely friction points:
+
 - `EventBus` import side effects — fine, events fire into the void in tests.
 - If `GraphInterrupt` does not reject but returns `__interrupt__` in v1.3, change the third test's assertion to `expect(result.__interrupt__).toBeDefined()`.
 
@@ -2564,6 +2873,7 @@ git commit -m "feat(agent): executor subgraph assembly with integration tests"
 ### Task 13: Root graph wiring — plan approval, executor node, report node
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/root/planApproval.ts`
 - Create: `packages/agent/src/nodes/root/executorReport.ts`
 - Modify: `packages/agent/src/nodes/root/index.ts`
@@ -2577,9 +2887,16 @@ git commit -m "feat(agent): executor subgraph assembly with integration tests"
 import { afterPlanner, afterPlanApproval } from '../../../packages/agent/src/graphs/root';
 
 const plan = {
-  goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
-  files_affected: [], gitStep: null,
-  steps: [{ id: 'edit-a', kind: 'edit', title: 't', files: [], depends_on: [], expected_output: 'e' }],
+  goal: 'g',
+  clarifying_questions: [],
+  risk: 'low',
+  assumptions: [],
+  constraints: [],
+  files_affected: [],
+  gitStep: null,
+  steps: [
+    { id: 'edit-a', kind: 'edit', title: 't', files: [], depends_on: [], expected_output: 'e' },
+  ],
 };
 
 describe('afterPlanner', () => {
@@ -2791,6 +3108,7 @@ git commit -m "feat(agent): wire executor subgraph into root with plan approval"
 ### Task 14: CLI rendering of executor progress events
 
 **Files:**
+
 - Modify: `apps/cli/src/screens/chat/Chat.tsx` (subscriptions block around line 150-270)
 
 No unit test (Ink UI; covered by manual run). Keep changes additive.
@@ -2834,6 +3152,7 @@ If the `StaticItem` union in the CLI types does not have a `'system'` kind with 
 ```bash
 pnpm build
 ```
+
 Expected: clean build. Manual verification happens in Task 15's end-to-end check.
 
 - [ ] **Step 3: Commit**
@@ -2861,6 +3180,7 @@ npx tsc --noEmit --project packages/shared/tsconfig.json
 npx tsc --noEmit --project packages/agent/tsconfig.json
 pnpm build
 ```
+
 Expected: no errors.
 
 - [ ] **Step 3: Lint**

@@ -69,13 +69,14 @@ User input
 The root graph is a two-node loop: `agent_node → tools_node → agent_node`, with `summarizer` as the exit node when the agent returns no tool calls. Everything from spec 1 (reader, plan approval, parallel execution) lives inside tool implementations — not as graph nodes.
 
 **Root graph state:**
+
 ```typescript
 interface RootState {
-  messages:         BaseMessage[]
-  cwd:              string
-  sessionId:        string
-  workspaceContext: WorkspaceContext
-  selectedFiles:    SelectedFile[]
+  messages: BaseMessage[];
+  cwd: string;
+  sessionId: string;
+  workspaceContext: WorkspaceContext;
+  selectedFiles: SelectedFile[];
 }
 ```
 
@@ -88,6 +89,7 @@ No `steps_state`, `readerOutputs`, or `editIntents` in root state — those conc
 **context_selector** runs once before the graph. No LLM involved.
 
 Reads from disk in parallel:
+
 - `cwd` absolute path
 - `git status --short` + `git log --oneline -10`
 - `git diff HEAD` (unstaged changes, truncated at 200 lines)
@@ -104,12 +106,15 @@ Output: `WorkspaceContext` — a serialized block injected into the system promp
 **1. extract_keywords** — single LLM call. Receives the user's task. Produces `string[]`: function names, symbol names, file name fragments, import paths, error strings, config keys. Expands beyond what the user literally typed.
 
 **2. grep** — ripgrep scan per keyword:
+
 ```
 rg --json -l "<keyword>" <cwd>
 ```
+
 Excludes: `node_modules`, `dist`, `.git`, `*.snap`, `*.lock`. Returns `{ file, matchedKeywords[], lineRanges[] }[]`.
 
 **3. score** — TF-IDF per file:
+
 - term frequency: how many distinct keywords matched in this file
 - inverse document frequency: keywords that appear in few files score higher
 - recency bonus: files touched in the last 10 commits get +0.2 weight
@@ -122,6 +127,7 @@ Excludes: `node_modules`, `dist`, `.git`, `*.snap`, `*.lock`. Returns `{ file, m
 ## Section 3 — Tool Set
 
 **Direct file tools** — read-only, always safe to run in parallel:
+
 ```
 read_file(path, lines?)          → string
 list_directory(path, maxDepth?)  → string[]
@@ -133,6 +139,7 @@ git_log(n?)                      → string
 ```
 
 **Mutation tools** — execute sequentially, require permission check:
+
 ```
 write_file(path, content)                      → void
 edit_file(path, anchor, replacement)           → void  // str_replace
@@ -144,26 +151,29 @@ run_tests(files[]?)                            → { passed, failed, output }
 ```
 
 **Control tools** — interrupt the loop:
+
 ```
 request_approval(plan)    → void   // interrupt() → user sees plan → resume
 ```
 
 **Subagent tool:**
+
 ```
 analyze_code(task, files[])  → ReaderOutputSchema
 ```
+
 Invokes the reader subgraph. Returns structured evidence: functions, classes, imports, references, key findings, and `potential_edit_strategy` with `OperationHint[]`. The agent calls this when it needs AST-level understanding before editing — cross-file refactors, rename operations, anything where reading the file and guessing is insufficient.
 
 **Permission model:**
 
-| Tool | Risk | Default behaviour |
-|---|---|---|
-| read_*, glob, grep, git_* | none | always allowed |
-| write_file, edit_file, insert_at_line | medium | allowed in `acceptEdits` mode, asks otherwise |
-| delete_file, rename_symbol | high | always asks |
-| bash | depends on command | asks unless in `dontAsk` mode |
-| analyze_code | none | always allowed |
-| request_approval | none | always allowed |
+| Tool                                  | Risk               | Default behaviour                             |
+| ------------------------------------- | ------------------ | --------------------------------------------- |
+| read*\*, glob, grep, git*\*           | none               | always allowed                                |
+| write_file, edit_file, insert_at_line | medium             | allowed in `acceptEdits` mode, asks otherwise |
+| delete_file, rename_symbol            | high               | always asks                                   |
+| bash                                  | depends on command | asks unless in `dontAsk` mode                 |
+| analyze_code                          | none               | always allowed                                |
+| request_approval                      | none               | always allowed                                |
 
 Modes: `default`, `acceptEdits`, `dontAsk`, `bypassPermissions`. Stored in session, toggled via `/approve` slash command.
 
@@ -195,9 +205,10 @@ analyze_code(task, files[])
         back to agent loop
 ```
 
-**file_reader** — `fs.readFile` for every file in `files[]`, parallel. Missing files logged as warnings, excluded from `filesAnalyzed`.
+**file_reader** — `fs.readFile` for every file in `files[]`, parallel. Missing files logged as warnings, excluded from `files_analyzed`.
 
 **ast_parser** — tree-sitter for all languages (TypeScript, JavaScript, and everything else). Extracts per file:
+
 - functions: name, signature, params, returnType, location (`file:line`), bodyPreview (first 5 lines), internal call list
 - classes: name, methods, properties, location
 - imports: source, specifiers, isDefault, location
@@ -205,13 +216,15 @@ analyze_code(task, files[])
 **import_graph** — for each file: which imports are local vs external, resolved absolute paths for local imports, cross-file reference map (`symbol → [{file, line, context}]`). Answers "if you change X, these files break."
 
 **reader_llm** — single structured-output LLM call. Receives file contents + AST data + import graph + task. Returns `ReaderOutputSchema` (existing schema, unchanged):
+
 - `status`: `sufficient | insufficient | blocked`
-- `summary`, `filesAnalyzed`, `functions`, `classes`, `imports`, `references`
+- `summary`, `files_analyzed`, `functions`, `classes`, `imports`, `references`
 - `key_findings[]`: verbatim snippets with `file`, `lines`, `content`, `comment`
 - `potential_edit_strategy`: `goal`, `files_to_modify`, `change_type`, `instructions`, `constraints`, `operation_hints[]`
 
 **Retry logic inside the subgraph:**
-- `insufficient` → append `unresolvedQuestions` to next task prompt, expand `files[]` with newly referenced paths, re-run from `file_reader`. Max 2 retries.
+
+- `insufficient` → append `unresolved_questions` to next task prompt, expand `files[]` with newly referenced paths, re-run from `file_reader`. Max 2 retries.
 - `blocked` → return `blocked` status to the agent loop. Agent decides whether to call `request_approval` with an explanation or surface the question via chat.
 
 ---
@@ -251,6 +264,7 @@ agent_node continues
 `plan` is a plain string — the agent composes it naturally as part of its reasoning (typically a numbered list of intended changes). No `PlannerOutputSchema` required.
 
 **Other interrupt points** use existing events:
+
 - `agent:tool_pending` — before a high-risk tool (delete_file, destructive bash)
 
 When `analyze_code` returns `blocked`, the agent receives it as a normal tool result and responds in chat asking the user for clarification. No interrupt — the user replies, the loop continues.
@@ -262,6 +276,7 @@ Both interrupt points resume via `graph.invoke(new Command({ resume: value }), c
 ## Section 6 — Tool Execution & Summarizer
 
 **edit_file (str_replace):**
+
 1. Read current file content from disk
 2. Verify `anchor` exists as exact substring — if not found, return error with file snippet (±10 lines around expected location) so agent can retry with corrected anchor
 3. Replace anchor with `replacement`
@@ -269,23 +284,27 @@ Both interrupt points resume via `graph.invoke(new Command({ resume: value }), c
 5. Run `tsc --noEmit` on the file if TypeScript, eslint if config present — append errors to tool result immediately
 
 **rename_symbol (tree-sitter):**
+
 1. Parse file with tree-sitter to locate the symbol's definition node
 2. `grep(symbol, cwd)` to find all reference sites across the project
 3. For each reference site: `edit_file` with the symbol string as anchor, `newSymbol` as replacement
 4. Returns count of files modified
 
 **bash:**
+
 - Executes in `cwd` with 30s timeout (configurable)
 - Returns `{ stdout, stderr, exitCode }`
 - Permission check before execution (always asks unless `dontAsk` mode)
 - Blocked: `rm -rf /`, fork bombs — rejected before execution
 
 **run_tests:**
+
 - Detects test runner from `package.json` scripts (`jest`, `vitest`, `mocha`)
 - Runs against provided files or full suite if none specified
 - Returns `{ passed, failed, output }` — failed tests include assertion message + stack trace
 
 **Summarizer** — final node when agent exits loop:
+
 - `git diff HEAD` of all modified files
 - List of created / deleted / renamed files
 - Final `tsc --noEmit` exit code
@@ -299,12 +318,14 @@ Output printed to terminal. Failed tool calls listed with their last error.
 ## Section 7 — Session, Compaction & Slash Commands
 
 **Session storage** — unchanged:
+
 - Sessions indexed at `.robocode/index.json` relative to `cwd`
 - Messages, tool calls, tool results stored under `.robocode/sessions/`
 - LangGraph checkpoints in `~/.robocode/checkpoints.db` (SQLite)
 - Thread ID: `{sessionId}_main`
 
 **Context compaction** — triggers automatically at 80% of model context window:
+
 1. Filter to human + assistant messages only
 2. LLM summarizes into a concise context block (goals, decisions, findings, current state)
 3. Replace message history with single `SystemMessage` containing summary
@@ -314,15 +335,15 @@ Also triggerable manually via `/compact`.
 
 **Slash commands** — intercepted in `Chat.tsx` before reaching the agent:
 
-| Command | Behaviour |
-|---|---|
-| `/clear` | Stop agent, delete session, create fresh session |
-| `/compact` | Emit `agent:compact_request` |
-| `/approve` | Toggle `acceptEdits` permission mode |
-| `/help` | Show available commands |
-| `/audit [N]` | Show last N audit entries (default 10) |
-| `/transcript` | Print session file path |
-| `/inspect` | Open session inspector screen |
+| Command       | Behaviour                                        |
+| ------------- | ------------------------------------------------ |
+| `/clear`      | Stop agent, delete session, create fresh session |
+| `/compact`    | Emit `agent:compact_request`                     |
+| `/approve`    | Toggle `acceptEdits` permission mode             |
+| `/help`       | Show available commands                          |
+| `/audit [N]`  | Show last N audit entries (default 10)           |
+| `/transcript` | Print session file path                          |
+| `/inspect`    | Open session inspector screen                    |
 
 **Memory** — `.ROBO.md` in `cwd` is the project's persistent instruction file. Read by `context_selector` on every run, injected into system prompt. The agent never writes to it.
 
@@ -378,6 +399,7 @@ packages/
 **Build order** unchanged: `core → shared → config → providers → tools → agent → ui → cli`
 
 **Deleted entirely:**
+
 - `packages/agent/src/main/root/` — replaced by `main/` flat structure
 - `packages/agent/src/main/subagents/editor/` — editor subagent removed, agent uses flat tools directly
 - `packages/agent/src/main/subagents/git/` — git tools are flat tools, no subagent needed
@@ -387,10 +409,10 @@ packages/
 ## Section 9 — Error Handling
 
 **LLM structured output failure** (reader_llm, extract_keywords):
-Zod parse error appended to next prompt: `"Your previous response failed validation: [error]. Fix and retry."` Max 3 retries. On third failure: return `blocked` status with the validation error as `unresolvedQuestions`.
+Zod parse error appended to next prompt: `"Your previous response failed validation: [error]. Fix and retry."` Max 3 retries. On third failure: return `blocked` status with the validation error as `unresolved_questions`.
 
 **File not found** (file_reader, read_file tool):
-Logged as warning. Excluded from `filesAnalyzed`. Tool result includes the error — agent can call `glob` or `find_symbol` to locate the correct path.
+Logged as warning. Excluded from `files_analyzed`. Tool result includes the error — agent can call `glob` or `find_symbol` to locate the correct path.
 
 **Anchor not found** (edit_file):
 Tool returns error with file content ±10 lines around expected location. Agent retries with corrected anchor. After two failures on the same file: falls back to `write_file` with full file content.

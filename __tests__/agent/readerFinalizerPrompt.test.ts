@@ -15,7 +15,7 @@ describe('READER_FINALIZER_PROMPT', () => {
     expect(prompt).toContain('schemaVersion');
     expect(prompt).toContain('summary');
     expect(prompt).toContain('key_findings');
-    expect(prompt).toContain('filesAnalyzed');
+    expect(prompt).toContain('files_analyzed');
     // focus list is rendered
     expect(prompt).toContain('src/app.tsx');
   });

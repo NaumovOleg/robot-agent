@@ -117,9 +117,9 @@ Current issues include:
 
 - lines returned as arrays instead of strings
 - operation_hints missing nodeType
-- files referenced but not in filesAnalyzed
+- files referenced but not in files_analyzed
 - potential_edit_strategy returned during insufficient status
-- missing unresolvedQuestions for insufficient status
+- missing unresolved_questions for insufficient status
 - location parsing inconsistencies
 - AST/text operation confusion
 - excessive nullable/default complexity
@@ -252,7 +252,7 @@ Status handling:
 
 - sufficient => potential_edit_strategy REQUIRED
 - insufficient/blocked => potential_edit_strategy MUST be null
-- insufficient/blocked => unresolvedQuestions REQUIRED
+- insufficient/blocked => unresolved_questions REQUIRED
 
 9. FINAL GOAL
 

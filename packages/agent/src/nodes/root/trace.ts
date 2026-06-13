@@ -25,6 +25,6 @@ export const summarizeRootState = (state: RootStateType): string => {
 export const traceRootNode =
   <R>(name: string, fn: (state: RootStateType) => R): ((state: RootStateType) => R) =>
   (state) => {
-    debug(`[graph/root] → ${name.padEnd(16)} ${summarizeRootState(state)}`);
+    debug(`[graph/root] →`, state);
     return fn(state);
   };

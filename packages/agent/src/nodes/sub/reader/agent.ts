@@ -1,6 +1,6 @@
 import { EventBus } from '@robocode-packages/core';
 import { createBaseModel } from '../../../utils';
-import type { ReaderStateType } from '../../../subagents/reader/state';
+import type { ReaderStateType } from '@robocode-packages/shared';
 import { READER_TOOLS } from '@robocode-packages/tools';
 
 export const agentNode = async (state: ReaderStateType) => {
@@ -16,8 +16,5 @@ export const agentNode = async (state: ReaderStateType) => {
 
   const response = await model.invoke(state.messages);
 
-  return {
-    messages: [response],
-    turnCount: state.turnCount + 1,
-  };
+  return { messages: [response], turnCount: state.turnCount + 1 };
 };

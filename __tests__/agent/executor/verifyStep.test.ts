@@ -11,14 +11,33 @@ const mkState = (
 ) =>
   ({
     plan: {
-      goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
-      files_affected: files, gitStep: null,
-      steps: [{ id: 'edit-a', kind: 'edit', title: 't', files, depends_on: [], expected_output: 'e' }],
+      goal: 'g',
+      clarifying_questions: [],
+      risk: 'low',
+      assumptions: [],
+      constraints: [],
+      files_affected: files,
+      gitStep: null,
+      steps: [
+        { id: 'edit-a', kind: 'edit', title: 't', files, depends_on: [], expected_output: 'e' },
+      ],
     },
-    context: null, cwd, sessionId: 's', stepResults: [], stepStates: {},
-    currentStepId: 'edit-a', currentHints: [], readerFindings: {}, fileSnapshots: {},
-    retryCounts: {}, appliedOps: {}, lastError: null, userGuidance: null,
-    verifyOutput: null, escalationDecision: null, baselineErrors,
+    context: null,
+    cwd,
+    sessionId: 's',
+    stepResults: [],
+    stepStates: {},
+    currentStepId: 'edit-a',
+    currentHints: [],
+    key_findings: {},
+    fileSnapshots: {},
+    retryCounts: {},
+    appliedOps: {},
+    lastError: null,
+    userGuidance: null,
+    verifyOutput: null,
+    escalationDecision: null,
+    baselineErrors,
     verifyCommands: { typeCheck: null, testRunner: null, lint: null, ...verifyCommands },
   }) as never;
 
@@ -42,11 +61,30 @@ describe('verifyStepNode', () => {
     const state = {
       ...(mkState(dir, { typeCheck: 'node -e "process.exit(1)"' }) as Record<string, unknown>),
       plan: {
-        goal: 'g', clarifying_questions: [], risk: 'low', assumptions: [], constraints: [],
-        files_affected: ['src/a.ts'], gitStep: null,
+        goal: 'g',
+        clarifying_questions: [],
+        risk: 'low',
+        assumptions: [],
+        constraints: [],
+        files_affected: ['src/a.ts'],
+        gitStep: null,
         steps: [
-          { id: 'edit-a', kind: 'edit', title: 't', files: ['src/a.ts'], depends_on: [], expected_output: 'e' },
-          { id: 'create-b', kind: 'create', title: 't', files: ['src/b.ts'], depends_on: [], expected_output: 'e' },
+          {
+            id: 'edit-a',
+            kind: 'edit',
+            title: 't',
+            files: ['src/a.ts'],
+            depends_on: [],
+            expected_output: 'e',
+          },
+          {
+            id: 'create-b',
+            kind: 'create',
+            title: 't',
+            files: ['src/b.ts'],
+            depends_on: [],
+            expected_output: 'e',
+          },
         ],
       },
       stepStates: { 'edit-a': 'running', 'create-b': 'pending' },
@@ -66,7 +104,9 @@ describe('verifyStepNode', () => {
 
   it('fails with output tail when typeCheck fails', async () => {
     const res = await verifyStepNode(
-      mkState(dir, { typeCheck: 'node -e "console.error(\'error TS2304: boom\'); process.exit(1)"' })
+      mkState(dir, {
+        typeCheck: 'node -e "console.error(\'error TS2304: boom\'); process.exit(1)"',
+      })
     );
     expect(res.lastError).toMatch(/Type check failed/);
     expect(res.verifyOutput).toContain('TS2304');
@@ -74,7 +114,8 @@ describe('verifyStepNode', () => {
 
   it('passes when the only type errors are pre-existing (in the baseline)', async () => {
     // tsc reports a baseline error every run; the step introduced nothing new.
-    const cmd = 'node -e "console.error(\'foo.ts(1,1): error TS2304: pre-existing\'); process.exit(1)"';
+    const cmd =
+      'node -e "console.error(\'foo.ts(1,1): error TS2304: pre-existing\'); process.exit(1)"';
     const res = await verifyStepNode(
       mkState(dir, { typeCheck: cmd }, ['src/a.ts'], ['foo.ts|error TS2304: pre-existing'])
     );
@@ -83,7 +124,7 @@ describe('verifyStepNode', () => {
 
   it('fails only on errors not present in the baseline', async () => {
     const cmd =
-      'node -e "console.error(\'foo.ts(1,1): error TS2304: pre-existing\'); console.error(\'src/a.ts(3,3): error TS2345: new break\'); process.exit(1)"';
+      "node -e \"console.error('foo.ts(1,1): error TS2304: pre-existing'); console.error('src/a.ts(3,3): error TS2345: new break'); process.exit(1)\"";
     const res = await verifyStepNode(
       mkState(dir, { typeCheck: cmd }, ['src/a.ts'], ['foo.ts|error TS2304: pre-existing'])
     );
@@ -112,8 +153,10 @@ describe('verifyStepNode', () => {
     await fs.writeFile(path.join(dir, 'src/a.test.ts'), 'x');
     await fs.writeFile(path.join(dir, 'src/b.test.ts'), 'x');
     const res = await verifyStepNode(
-      mkState(dir, { testRunner: 'node -e "console.log(process.argv.slice(1).join(\' \'))" --' },
-        ['src/a.ts', 'src/b.ts'])
+      mkState(dir, { testRunner: 'node -e "console.log(process.argv.slice(1).join(\' \'))" --' }, [
+        'src/a.ts',
+        'src/b.ts',
+      ])
     );
     expect(res.lastError).toBeNull();
     // last verified file's output retained
@@ -123,7 +166,9 @@ describe('verifyStepNode', () => {
   it('fails when a related test run fails', async () => {
     await fs.writeFile(path.join(dir, 'src/a.test.ts'), 'x');
     const res = await verifyStepNode(
-      mkState(dir, { testRunner: 'node -e "console.error(\'assertion failed\'); process.exit(1)" --' })
+      mkState(dir, {
+        testRunner: 'node -e "console.error(\'assertion failed\'); process.exit(1)" --',
+      })
     );
     expect(res.lastError).toMatch(/Tests failed \(src\/a\.test\.ts\)/);
     expect(res.verifyOutput).toContain('assertion failed');

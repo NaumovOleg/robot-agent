@@ -1,6 +1,6 @@
 import { Annotation, messagesStateReducer } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
-import type { ReaderOutput } from '@robocode-packages/shared';
+import type { ReaderOutput } from '../types';
 
 export const ReaderState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -48,5 +48,3 @@ export const ReaderState = Annotation.Root({
     default: () => null,
   }),
 });
-
-export type ReaderStateType = typeof ReaderState.State;

@@ -24,9 +24,9 @@ function parseJsonRecord(value: unknown): MaybeRecord | null {
 }
 
 function sanitizeReaderOutputCandidate(candidate: MaybeRecord): MaybeRecord {
-  const filesAnalyzed = Array.isArray(candidate.filesAnalyzed) ? candidate.filesAnalyzed : [];
+  const files_analyzed = Array.isArray(candidate.files_analyzed) ? candidate.files_analyzed : [];
   const analyzedSet = new Set(
-    filesAnalyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
+    files_analyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
   );
 
   const sanitizeByLocation = (items: unknown): unknown[] => {
@@ -140,17 +140,17 @@ function synthesizeMinimalOutput(error: unknown, state: ReaderStateType): Reader
     `Partial inspection of ${focus.join(', ') || state.task || 'the target files'}; ` +
       `the structured reader output could not be fully parsed.`;
 
-  const filesAnalyzed =
-    raw && Array.isArray(raw.filesAnalyzed)
-      ? raw.filesAnalyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
+  const files_analyzed =
+    raw && Array.isArray(raw.files_analyzed)
+      ? raw.files_analyzed.filter((f): f is string => typeof f === 'string' && f.length > 0)
       : focus;
 
   const candidate = {
     schemaVersion: 'reader.output.v2' as const,
     status: 'insufficient' as const,
     summary,
-    filesAnalyzed,
-    unresolvedQuestions: [
+    files_analyzed,
+    unresolved_questions: [
       'Reader output could not be fully parsed; proceeding with partial context.',
     ],
     potential_edit_strategy: null,
@@ -160,7 +160,7 @@ function synthesizeMinimalOutput(error: unknown, state: ReaderStateType): Reader
   if (validated.success) return validated.data;
   // Schema somehow still rejects (e.g. odd file paths) — return a bare object that
   // satisfies the type. readerStep treats `insufficient` as a usable digest.
-  return { ...candidate, filesAnalyzed: [] } as unknown as ReaderOutput;
+  return { ...candidate, files_analyzed: [] } as unknown as ReaderOutput;
 }
 
 export async function finalReadNode(state: ReaderStateType) {
@@ -186,7 +186,10 @@ export async function finalReadNode(state: ReaderStateType) {
       // Never throw: degrade to a minimal insufficient digest so one bad field
       // doesn't fail the whole inspect step.
       editIntentInputPayload = synthesizeMinimalOutput(err, state);
-      debug('[reader/final] parse failed; degraded to insufficient digest:', editIntentInputPayload.summary);
+      debug(
+        '[reader/final] parse failed; degraded to insufficient digest:',
+        editIntentInputPayload.summary
+      );
     }
   }
 

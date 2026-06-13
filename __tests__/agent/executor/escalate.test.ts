@@ -54,16 +54,40 @@ describe('dedupeStepResults', () => {
 describe('digestReaderOutput', () => {
   it('clips findings and extracts hints', () => {
     const digest = digestReaderOutput('inspect-a', {
-      schemaVersion: 'reader.output.v2', status: 'sufficient',
-      summary: 'S', language: 'typescript', filesAnalyzed: ['src/a.ts'],
-      functions: [], classes: [], imports: [], references: [], unresolvedQuestions: [],
+      schemaVersion: 'reader.output.v2',
+      status: 'sufficient',
+      summary: 'S',
+      language: 'typescript',
+      files_analyzed: ['src/a.ts'],
+      functions: [],
+      classes: [],
+      imports: [],
+      references: [],
+      unresolved_questions: [],
       key_findings: Array.from({ length: 30 }, (_, i) => ({
-        file: 'src/a.ts', lines: String(i), content: 'x'.repeat(2000), comment: `c${i}`,
+        file: 'src/a.ts',
+        lines: String(i),
+        content: 'x'.repeat(2000),
+        comment: `c${i}`,
       })),
       potential_edit_strategy: {
-        goal: 'g', files_to_modify: ['src/a.ts'], change_type: 'modify',
-        instructions: 'i', constraints: [],
-        operation_hints: [{ op: 'replace_text', file: 'src/a.ts', anchor: 'x', details: 'd', lines: '', nodeType: null, symbol: null, newSymbol: null }],
+        goal: 'g',
+        files_to_modify: ['src/a.ts'],
+        change_type: 'modify',
+        instructions: 'i',
+        constraints: [],
+        operation_hints: [
+          {
+            op: 'replace_text',
+            file: 'src/a.ts',
+            anchor: 'x',
+            details: 'd',
+            lines: '',
+            nodeType: null,
+            symbol: null,
+            newSymbol: null,
+          },
+        ],
       },
     } as never);
     expect(digest.stepId).toBe('inspect-a');

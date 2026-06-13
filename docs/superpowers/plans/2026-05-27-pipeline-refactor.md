@@ -13,12 +13,14 @@
 ## File Map
 
 ### Created
+
 - `packages/agent/src/nodes/root/collectRouterAnswers.ts` — clarification node + router for router_intent stage
 - `packages/agent/src/nodes/root/stepReader.ts` — runs readerAgent for one plan step + router
 - `packages/agent/src/nodes/root/advanceStep.ts` — increments step index, resets per-step reader state, routes to next step or edit_intent
 - `__tests__/agent/pipelineRouters.test.ts` — unit tests for all new pure router functions
 
 ### Modified
+
 - `packages/shared/src/types/event.ts` — add `type` to `agent:question_pending`; remove `agent:clarification:router-intent:*`
 - `packages/agent/src/main/subagents/routerIntent/graph.ts` — remove clarification node + checkpointer; `START → agent → END`
 - `packages/agent/src/main/subagents/routerIntent/state.ts` — remove `question` and `answer` fields
@@ -36,6 +38,7 @@
 - `packages/agent/src/index.ts` — remove `onPattern` handler
 
 ### Deleted
+
 - `packages/agent/src/nodes/sub/routerIntent/clarification.ts`
 - `packages/agent/src/main/subagents/routerIntent/router.ts`
 
@@ -44,6 +47,7 @@
 ## Task 1: Update shared event types
 
 **Files:**
+
 - Modify: `packages/shared/src/types/event.ts`
 
 - [ ] **Step 1: Update `agent:question_pending` and remove router-intent events**
@@ -101,6 +105,7 @@ git commit -m "feat: unify clarification events — add type discriminator to ag
 ## Task 2: Simplify routerIntent subgraph
 
 **Files:**
+
 - Modify: `packages/agent/src/main/subagents/routerIntent/state.ts`
 - Modify: `packages/agent/src/main/subagents/routerIntent/graph.ts`
 - Modify: `packages/agent/src/nodes/sub/routerIntent/agent.ts`
@@ -270,6 +275,7 @@ git commit -m "refactor: simplify routerIntent subgraph to pure classifier — r
 ## Task 3: Fix routerIntentNode (root)
 
 **Files:**
+
 - Modify: `packages/agent/src/nodes/root/routerIntent.ts`
 
 The current node uses `RouterIntentStateType` (wrong — it runs inside the root graph which uses `RootStateType`), returns the full subgraph state instead of just `intent`, and doesn't inject clarification context.
@@ -291,19 +297,18 @@ export const routerIntentNode =
 
     debug('ROUTER INTENT FROM MAIN', { sessionId, cwd });
 
-    const clarificationBlock =
-      answeredClarificationQuestions?.length
-        ? `\n\nPreviously answered clarifications:\n${answeredClarificationQuestions
-            .map((qa) => `Q: ${qa.question}\nA: ${qa.answer}`)
-            .join('\n')}`
-        : '';
+    const clarificationBlock = answeredClarificationQuestions?.length
+      ? `\n\nPreviously answered clarifications:\n${answeredClarificationQuestions
+          .map((qa) => `Q: ${qa.question}\nA: ${qa.answer}`)
+          .join('\n')}`
+      : '';
 
     const lastMessage = messages.at(-1);
     const enrichedMessages =
       clarificationBlock && lastMessage
         ? [
             ...messages.slice(0, -1),
-            new HumanMessage((lastMessage.content as string ?? '') + clarificationBlock),
+            new HumanMessage(((lastMessage.content as string) ?? '') + clarificationBlock),
           ]
         : messages;
 
@@ -339,6 +344,7 @@ git commit -m "fix: routerIntentNode — use RootStateType, inject clarification
 ## Task 4: Expand RootState
 
 **Files:**
+
 - Modify: `packages/agent/src/main/root/state.ts`
 
 - [ ] **Step 1: Add `currentPlanStepIndex`, `readerOutputs`, `editIntent`**
@@ -441,6 +447,7 @@ git commit -m "feat: add currentPlanStepIndex, readerOutputs, editIntent to Root
 ## Task 5: Add `collectRouterAnswers` node and write router tests
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/root/collectRouterAnswers.ts`
 - Create: `__tests__/agent/pipelineRouters.test.ts`
 
@@ -453,7 +460,11 @@ import type { RootStateType } from '../../packages/agent/src/main/root/state';
 
 // Minimal state factory — only the fields each router reads
 const makeState = (overrides: Partial<RootStateType>): RootStateType =>
-  ({ answeredClarificationQuestions: [], answeredReaderQuestions: [], ...overrides }) as unknown as RootStateType;
+  ({
+    answeredClarificationQuestions: [],
+    answeredReaderQuestions: [],
+    ...overrides,
+  }) as unknown as RootStateType;
 
 // ── collectRouterAnswersRouter ─────────────────────────────────────────────
 import { collectRouterAnswersRouter } from '../../packages/agent/src/nodes/root/collectRouterAnswers';
@@ -461,7 +472,10 @@ import { collectRouterAnswersRouter } from '../../packages/agent/src/nodes/root/
 describe('collectRouterAnswersRouter', () => {
   it('routes to collect_router_answers when needsClarification is true and question is set', () => {
     const state = makeState({
-      routerIntent: { needsClarification: true, question: 'What framework?' } as RootStateType['routerIntent'],
+      routerIntent: {
+        needsClarification: true,
+        question: 'What framework?',
+      } as RootStateType['routerIntent'],
     });
     expect(collectRouterAnswersRouter(state)).toBe('collect_router_answers');
   });
@@ -474,7 +488,9 @@ describe('collectRouterAnswersRouter', () => {
   });
 
   it('routes to file_selector when routerIntent is undefined', () => {
-    const state = makeState({ routerIntent: undefined as unknown as RootStateType['routerIntent'] });
+    const state = makeState({
+      routerIntent: undefined as unknown as RootStateType['routerIntent'],
+    });
     expect(collectRouterAnswersRouter(state)).toBe('file_selector');
   });
 });
@@ -551,6 +567,7 @@ git commit -m "feat: add collectRouterAnswers node with unified question_pending
 ## Task 6: Fix `collectPlannerAnswers` and `collectReaderAnswers`
 
 **Files:**
+
 - Modify: `packages/agent/src/nodes/root/collectPlannerAnswers.ts`
 - Modify: `packages/agent/src/nodes/root/collectReaderAnswers.ts`
 
@@ -581,7 +598,7 @@ import { collectReaderAnswersRouter } from '../../packages/agent/src/nodes/root/
 describe('collectReaderAnswersRouter', () => {
   it('loops to collect_reader_answers when current step questions are not fully answered', () => {
     const state = makeState({
-      readerOutput: { unresolvedQuestions: ['Q1', 'Q2'] } as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: ['Q1', 'Q2'] } as RootStateType['readerOutput'],
       answeredReaderQuestions: [{ question: 'Q1', answer: 'A1' }],
     });
     expect(collectReaderAnswersRouter(state)).toBe('collect_reader_answers');
@@ -589,7 +606,7 @@ describe('collectReaderAnswersRouter', () => {
 
   it('routes to advance_step when all current step questions are answered', () => {
     const state = makeState({
-      readerOutput: { unresolvedQuestions: ['Q1'] } as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: ['Q1'] } as RootStateType['readerOutput'],
       answeredReaderQuestions: [{ question: 'Q1', answer: 'A1' }],
     });
     expect(collectReaderAnswersRouter(state)).toBe('advance_step');
@@ -597,7 +614,7 @@ describe('collectReaderAnswersRouter', () => {
 
   it('routes to advance_step when no questions exist', () => {
     const state = makeState({
-      readerOutput: { unresolvedQuestions: [] } as unknown as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: [] } as unknown as RootStateType['readerOutput'],
       answeredReaderQuestions: [],
     });
     expect(collectReaderAnswersRouter(state)).toBe('advance_step');
@@ -606,7 +623,7 @@ describe('collectReaderAnswersRouter', () => {
   it('does not count answers from previous steps toward current step quota', () => {
     // Step 1 had Q_prev answered; step 2 has Q_current unanswered
     const state = makeState({
-      readerOutput: { unresolvedQuestions: ['Q_current'] } as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: ['Q_current'] } as RootStateType['readerOutput'],
       answeredReaderQuestions: [{ question: 'Q_prev', answer: 'A_prev' }],
     });
     expect(collectReaderAnswersRouter(state)).toBe('collect_reader_answers');
@@ -634,7 +651,7 @@ import type { RootStateType } from '../../main/root/state';
 
 export const collectReaderAnswersNode = async (state: RootStateType) => {
   const { sessionId, readerOutput, answeredReaderQuestions = [] } = state;
-  const questions = readerOutput?.unresolvedQuestions ?? [];
+  const questions = readerOutput?.unresolved_questions ?? [];
   if (questions.length === 0) return {};
 
   // Only count answers for this step's questions (answers from prior steps accumulate in state)
@@ -669,7 +686,7 @@ export const collectReaderAnswersNode = async (state: RootStateType) => {
 };
 
 export const collectReaderAnswersRouter = (state: RootStateType): string => {
-  const questions = state.readerOutput?.unresolvedQuestions ?? [];
+  const questions = state.readerOutput?.unresolved_questions ?? [];
   const currentStepAnswered = (state.answeredReaderQuestions ?? []).filter((qa) =>
     questions.includes(qa.question)
   );
@@ -698,6 +715,7 @@ git commit -m "fix: collectPlannerAnswers/collectReaderAnswers — unified event
 ## Task 7: Add `stepReader` node
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/root/stepReader.ts`
 
 - [ ] **Step 1: Write failing tests for `stepReaderRouter`**
@@ -711,14 +729,14 @@ import { stepReaderRouter } from '../../packages/agent/src/nodes/root/stepReader
 describe('stepReaderRouter', () => {
   it('routes to collect_reader_answers when readerOutput has unresolved questions', () => {
     const state = makeState({
-      readerOutput: { unresolvedQuestions: ['Where is auth?'] } as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: ['Where is auth?'] } as RootStateType['readerOutput'],
     });
     expect(stepReaderRouter(state)).toBe('collect_reader_answers');
   });
 
   it('routes to advance_step when no unresolved questions', () => {
     const state = makeState({
-      readerOutput: { unresolvedQuestions: [] } as unknown as RootStateType['readerOutput'],
+      readerOutput: { unresolved_questions: [] } as unknown as RootStateType['readerOutput'],
     });
     expect(stepReaderRouter(state)).toBe('advance_step');
   });
@@ -755,17 +773,20 @@ export const stepReaderNode = async (state: RootStateType) => {
   const currentStep = nonInspectSteps[state.currentPlanStepIndex ?? 0];
   if (!currentStep) return {};
 
-  debug('[stepReader] running for step:', currentStep.title, `(index ${state.currentPlanStepIndex})`);
+  debug(
+    '[stepReader] running for step:',
+    currentStep.title,
+    `(index ${state.currentPlanStepIndex})`
+  );
 
   const result = await readerAgent.run({
     task: `${currentStep.title}. Expected outcome: ${currentStep.expected_output}`,
     focus: [...currentStep.files, ...(state.selectedFiles ?? [])],
     user_goal: state.plan!.goal,
     current_plan_step: currentStep.title,
-    instructions: [
-      ...(state.plan?.constraints ?? []),
-      ...(state.plan?.assumptions ?? []),
-    ].join('\n'),
+    instructions: [...(state.plan?.constraints ?? []), ...(state.plan?.assumptions ?? [])].join(
+      '\n'
+    ),
   });
 
   const readerOutput = result.editIntentInputPayload;
@@ -778,7 +799,7 @@ export const stepReaderNode = async (state: RootStateType) => {
 };
 
 export const stepReaderRouter = (state: RootStateType): string => {
-  if ((state.readerOutput?.unresolvedQuestions?.length ?? 0) > 0) {
+  if ((state.readerOutput?.unresolved_questions?.length ?? 0) > 0) {
     return 'collect_reader_answers';
   }
   return 'advance_step';
@@ -805,6 +826,7 @@ git commit -m "feat: add stepReader node — runs readerAgent per non-inspect pl
 ## Task 8: Add `advanceStep` node
 
 **Files:**
+
 - Create: `packages/agent/src/nodes/root/advanceStep.ts`
 
 - [ ] **Step 1: Write failing tests for `advanceStepRouter`**
@@ -816,8 +838,7 @@ Add to `__tests__/agent/pipelineRouters.test.ts`:
 import { advanceStepRouter } from '../../packages/agent/src/nodes/root/advanceStep';
 
 describe('advanceStepRouter', () => {
-  const makePlan = (steps: { kind: string }[]) =>
-    ({ steps } as unknown as RootStateType['plan']);
+  const makePlan = (steps: { kind: string }[]) => ({ steps }) as unknown as RootStateType['plan'];
 
   it('routes to step_reader when more non-inspect steps remain after current index', () => {
     const state = makeState({
@@ -907,6 +928,7 @@ git commit -m "feat: add advanceStep node — increments step index, routes to s
 ## Task 9: Fix `editIntentNode`
 
 **Files:**
+
 - Modify: `packages/agent/src/nodes/root/editIntent.ts`
 
 - [ ] **Step 1: Rewrite `editIntentNode` to use `readerOutputs[]`**
@@ -992,7 +1014,10 @@ export const editIntentNode = async (state: RootStateType) => {
   try {
     const result = await model.invoke([
       { role: 'system', content: EDIT_INTENT_SYSTEM_PROMPT },
-      { role: 'user', content: EDIT_INTENT_HUMAN_PROMPT(scaffold, output, answeredReaderQuestions) },
+      {
+        role: 'user',
+        content: EDIT_INTENT_HUMAN_PROMPT(scaffold, output, answeredReaderQuestions),
+      },
     ]);
 
     const normalizedEdits = normalizeCreateLikeTextInserts(
@@ -1036,6 +1061,7 @@ git commit -m "fix: editIntentNode — use readerOutputs array, merge evidence, 
 ## Task 10: Update `planApprovalNode` goto targets
 
 **Files:**
+
 - Modify: `packages/agent/src/nodes/planApproval.ts`
 
 The current node hardcodes `goto: 'debug'` in both Command returns. The `debug` node is being removed. Update to route approved plans to `step_reader` (or `edit_intent` when no non-inspect steps) and rejected plans to `END`.
@@ -1106,6 +1132,7 @@ git commit -m "fix: planApprovalNode — route approved plans to step_reader/edi
 ## Task 11: Rewire root graph
 
 **Files:**
+
 - Modify: `packages/agent/src/main/root/graph.ts`
 - Modify: `packages/agent/src/nodes/root/index.ts`
 
@@ -1137,12 +1164,21 @@ import { StateGraph, END, START } from '@langchain/langgraph';
 import { RootState, type RootStateType } from './state';
 import { Checkpointer } from '@robocode-packages/core';
 import { contextNode, routerIntentNode } from '../../nodes/root';
-import { collectRouterAnswersNode, collectRouterAnswersRouter } from '../../nodes/root/collectRouterAnswers';
-import { collectPlannerAnswersNode, collectPlannerAnswersRouter } from '../../nodes/root/collectPlannerAnswers';
+import {
+  collectRouterAnswersNode,
+  collectRouterAnswersRouter,
+} from '../../nodes/root/collectRouterAnswers';
+import {
+  collectPlannerAnswersNode,
+  collectPlannerAnswersRouter,
+} from '../../nodes/root/collectPlannerAnswers';
 import { plannerNode, plannerRouter } from '../../nodes/planner';
 import { planApprovalNode } from '../../nodes/planApproval';
 import { stepReaderNode, stepReaderRouter } from '../../nodes/root/stepReader';
-import { collectReaderAnswersNode, collectReaderAnswersRouter } from '../../nodes/root/collectReaderAnswers';
+import {
+  collectReaderAnswersNode,
+  collectReaderAnswersRouter,
+} from '../../nodes/root/collectReaderAnswers';
 import { advanceStepNode, advanceStepRouter } from '../../nodes/root/advanceStep';
 import { editIntentNode } from '../../nodes/root/editIntent';
 import { routerIntentAgent } from '../subagents/routerIntent';
@@ -1210,6 +1246,7 @@ git commit -m "feat: rewire root graph — full pipeline context→router→plan
 ## Task 12: Clean up RoboAgent and delete obsolete code
 
 **Files:**
+
 - Modify: `packages/agent/src/index.ts`
 
 - [ ] **Step 1: Remove the broken `onPattern` handler from RoboAgent**

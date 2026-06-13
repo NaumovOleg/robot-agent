@@ -1,8 +1,7 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
-import { toolsNode, agentNode, finalReadNode } from '../../nodes/sub/reader';
-import { router } from './router';
+import { toolsNode, agentNode, finalReadNode, router } from '../nodes/sub/reader';
 
-import { ReaderState } from './state';
+import { ReaderState } from '@robocode-packages/shared';
 
 export function createReaderGraph() {
   const graph = new StateGraph(ReaderState)

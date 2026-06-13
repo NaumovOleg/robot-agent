@@ -33,10 +33,16 @@ export const ExecutorState = Annotation.Root({
   // ── private loop state ──────────────────────────────────────────────────────
   stepStates: Annotation<Record<string, StepStatus>>(mergeRecord<StepStatus>()),
   currentStepId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
-  currentHints: Annotation<ExecutorHint[]>({ reducer: (_, n) => n, default: () => [] as ExecutorHint[] }),
+  currentHints: Annotation<ExecutorHint[]>({
+    reducer: (_, n) => n,
+    default: () => [] as ExecutorHint[],
+  }),
   // Last mini_reader verdict for this attempt. Drives routing: 'noop' → step done,
   // 'blocked' → escalate, 'edits' → validate. Reset when a step completes.
-  miniReaderStatus: Annotation<MiniReaderStatus | null>({ reducer: (_, n) => n, default: () => null }),
+  miniReaderStatus: Annotation<MiniReaderStatus | null>({
+    reducer: (_, n) => n,
+    default: () => null,
+  }),
   // Per-hint resolution failures from the validate node; consumed by repair.
   hintErrors: Annotation<{ index: number; op: string; file: string; reason: string }[]>({
     reducer: (_, n) => n,
@@ -44,10 +50,11 @@ export const ExecutorState = Annotation.Root({
   }),
   // Bounded counter for the validate→repair loop, per step (reset on step completion).
   repairCount: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
-  readerFindings: Annotation<Record<string, ReaderDigest>>(mergeRecord<ReaderDigest>()),
-  fileSnapshots: Annotation<Record<string, Record<string, string | null>>>(
-    mergeRecord<Record<string, string | null>>()
-  ),
+  key_findings: Annotation<Record<string, ReaderDigest>>(mergeRecord<ReaderDigest>()),
+  fileSnapshots:
+    Annotation<Record<string, Record<string, string | null>>>(
+      mergeRecord<Record<string, string | null>>()
+    ),
   retryCounts: Annotation<Record<string, number>>(mergeRecord<number>()),
   // applyNode replaces this per attempt; the previous attempt's ops are discarded with the rollback
   appliedOps: Annotation<Record<string, string[]>>(mergeRecord<string[]>()),
@@ -78,7 +85,10 @@ export const ExecutorState = Annotation.Root({
   // verify_step subtracts these so a step is only blamed for NEW errors it
   // introduced — not pre-existing project tsc noise (test files, etc.).
   baselineErrors: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
-  escalationDecision: Annotation<EscalationDecision | null>({ reducer: (_, n) => n, default: () => null }),
+  escalationDecision: Annotation<EscalationDecision | null>({
+    reducer: (_, n) => n,
+    default: () => null,
+  }),
 });
 
 export type ExecutorStateType = typeof ExecutorState.State;

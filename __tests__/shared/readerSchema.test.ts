@@ -11,7 +11,7 @@ describe('reader schemas — contract robustness', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 'Extract function info for App in src/app.tsx.',
       language: 'typescript',
-      filesAnalyzed: ['src/app.tsx'],
+      files_analyzed: ['src/app.tsx'],
       functions: [{ name: 'App', location: 'src/app.tsx:63' }],
     });
     expect(parsed.functions[0]).toMatchObject({ name: 'App', signature: null });
@@ -21,7 +21,7 @@ describe('reader schemas — contract robustness', () => {
   it('coerces structured params/calls objects into string arrays', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 's',
-      filesAnalyzed: ['src/a.ts'],
+      files_analyzed: ['src/a.ts'],
       functions: [
         {
           name: 'f',
@@ -38,7 +38,7 @@ describe('reader schemas — contract robustness', () => {
   it('tolerates extra (passthrough) fields on a function', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 's',
-      filesAnalyzed: ['src/a.ts'],
+      files_analyzed: ['src/a.ts'],
       functions: [{ name: 'f', location: 'src/a.ts:1', async: true, exported: true }],
     });
     expect(parsed.functions[0].name).toBe('f');
@@ -68,7 +68,7 @@ describe('reader schemas — contract robustness', () => {
   it('accepts valid reader output and applies defaults', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 'Route switch is implemented in src/app.tsx and can host faq case.',
-      filesAnalyzed: ['src/app.tsx'],
+      files_analyzed: ['src/app.tsx'],
       functions: [
         {
           name: 'Screen',
@@ -81,7 +81,8 @@ describe('reader schemas — contract robustness', () => {
         {
           file: 'src/app.tsx',
           lines: '27-40',
-          content: "switch (route) {\n  case 'welcome':\n    return <WelcomeScreen key=\"welcome\" />;\n}",
+          content:
+            'switch (route) {\n  case \'welcome\':\n    return <WelcomeScreen key="welcome" />;\n}',
           comment: 'Main route switch block.',
         },
       ],
@@ -96,15 +97,15 @@ describe('reader schemas — contract robustness', () => {
     });
 
     expect(parsed.language).toBeNull();
-    expect(parsed.unresolvedQuestions).toEqual([]);
+    expect(parsed.unresolved_questions).toEqual([]);
     expect(parsed.potential_edit_strategy?.files_to_modify).toEqual(['src/app.tsx']);
   });
 
-  it('rejects findings and strategy files that are not in filesAnalyzed', () => {
+  it('rejects findings and strategy files that are not in files_analyzed', () => {
     expect(() =>
       ReaderOutputSchema.parse({
         summary: 'Observed mismatch between inspected and strategy files.',
-        filesAnalyzed: ['src/a.ts'],
+        files_analyzed: ['src/a.ts'],
         key_findings: [
           {
             file: 'src/b.ts',
@@ -132,7 +133,7 @@ describe('reader schemas — contract robustness', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 'Collected enough evidence for code edit.',
       status: 'sufficient',
-      filesAnalyzed: ['src/router.ts'],
+      files_analyzed: ['src/router.ts'],
       key_findings: [
         {
           file: 'src/router.ts',
@@ -157,7 +158,7 @@ describe('reader schemas — contract robustness', () => {
     const parsed = ReaderOutputSchema.parse({
       summary: 'Inspected app entrypoint and found relevant declaration.',
       status: 'sufficient',
-      filesAnalyzed: ['src/app.tsx'],
+      files_analyzed: ['src/app.tsx'],
       functions: [
         {
           name: 'App',

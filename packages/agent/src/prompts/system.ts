@@ -27,7 +27,7 @@
 // - Use \`delegate_to_reader\` before any edit when the target code is unfamiliar or the task is ambiguous.
 // - Use \`delegate_to_writer\` only after you have a clear, verified edit intent.
 // - Use \`delegate_to_git\` to inspect state before major edits and to review diffs after.
-// - If \`delegate_to_reader\` returns \`status: "insufficient"\` or \`unresolvedQuestions\` are non-empty:
+// - If \`delegate_to_reader\` returns \`status: "insufficient"\` or \`unresolved_questions\` are non-empty:
 //   - Do not proceed to edit-intent generation.
 //   - Ask the user exactly one unresolved question at a time.
 //   - Wait for the answer before continuing.

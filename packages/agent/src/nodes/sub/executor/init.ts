@@ -53,13 +53,6 @@ export const initNode = async (state: ExecutorStateType) => {
     baselineErrors = parseVerifyErrors(baseline.output);
   }
 
-  debug(
-    '[executor/init]',
-    `goal: ${plan.goal.replace(/\s+/g, ' ').trim().slice(0, 200)}`,
-    `\n  ${plan.steps.length} step(s):`,
-    plan.steps.map((s) => `\n    [${s.kind}] ${s.id} (${s.files.join(', ') || 'no files'})`).join(''),
-    `\n  verify: typeCheck=${verifyCommands.typeCheck ?? 'none'}, testRunner=${verifyCommands.testRunner ?? 'none'}`,
-    `| ${baselineErrors.length} baseline tsc error(s)`
-  );
+  debug('[executor/init]', { stepStates, verifyCommands, baselineErrors, lastError: null });
   return { stepStates, verifyCommands, baselineErrors, lastError: null };
 };

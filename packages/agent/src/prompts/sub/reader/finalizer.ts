@@ -37,7 +37,7 @@ snippets. The downstream editor consumes mainly two fields:
    Reference exact file paths, symbol names, and line numbers you observed.
 
 2. **key_findings** — the concrete edit sites. Each finding:
-   - \`file\`: relative path (must also appear in \`filesAnalyzed\`)
+   - \`file\`: relative path (must also appear in \`files_analyzed\`)
    - \`lines\`: line range like "63" or "63-70" when known ("" if unknown)
    - \`content\`: a SHORT verbatim snippet (1–3 lines) copied exactly from source,
      including a stable single-line anchor the editor can target
@@ -49,15 +49,15 @@ snippets. The downstream editor consumes mainly two fields:
   unique anchor line, or a target path for create/delete) and summary +
   key_findings describe it.
 - "insufficient": you could NOT pin a concrete edit location, or a real blocking
-  unknown remains → fill \`unresolvedQuestions\` with the specific gaps.
+  unknown remains → fill \`unresolved_questions\` with the specific gaps.
 - "blocked": cannot proceed (missing files, permissions, unresolvable dependency)
-  → fill \`unresolvedQuestions\`.
+  → fill \`unresolved_questions\`.
 
 ## Other fields
-- \`filesAnalyzed\`: each inspected file once, relative paths. Every file named in
+- \`files_analyzed\`: each inspected file once, relative paths. Every file named in
   key_findings (or any other array) must appear here.
 - \`language\`: primary language detected (e.g. "typescript"), helps pick verify commands.
-- \`unresolvedQuestions\`: only concrete, actionable blocking unknowns. MUST be
+- \`unresolved_questions\`: only concrete, actionable blocking unknowns. MUST be
   non-empty when status is "insufficient" or "blocked".
 - \`functions\`, \`classes\`, \`imports\`, \`references\`: OPTIONAL supporting detail.
   Include ONLY AST evidence you actually observed (name + location is enough;

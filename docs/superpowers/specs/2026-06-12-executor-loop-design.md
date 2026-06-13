@@ -52,13 +52,13 @@ step_review ─ sufficient ─────────→ step_selector
 
 - **init** — no LLM. Validates the plan DAG, reads baseline file contents, derives verification commands from `WorkspaceContext.language` (`typeCheck`, `testRunner`, `lint`). Unsupported language → that tier is disabled.
 - **step_selector** — no LLM. Topological pick by `depends_on`: next step whose dependencies are all `done`. No eligible step + a `failed`/`skipped` blocker → deadlock → escalate. None left → finalize.
-- **reader_step** — invokes the existing reader subagent for an inspect step. Stores a compressed `ReaderDigest` (`summary`, clipped `key_findings`, `operation_hints`) in `readerFindings[stepId]`; the full `ReaderOutput` is not kept in loop state to keep mini-reader prompts small.
+- **reader_step** — invokes the existing reader subagent for an inspect step. Stores a compressed `ReaderDigest` (`summary`, clipped `key_findings`, `operation_hints`) in `key_findings[stepId]`; the full `ReaderOutput` is not kept in loop state to keep mini-reader prompts small.
 - **mini_reader** — LLM, single structured-output call (`MiniReaderOutputSchema`), no ReAct loop. Prompt input:
   1. The plan step (`title`, `kind`, `files`, `expected_output`) plus plan `goal` and `constraints`.
   2. Fresh contents of `step.files` read from disk with line numbers, clipped (~30KB/file).
-  3. `readerFindings` of the step's `depends_on` chain.
+  3. `key_findings` of the step's `depends_on` chain.
   4. On retry: `lastError` plus the diff the previous attempt produced (files are rolled back to the step snapshot before the retry, so every attempt starts from clean step state).
-  If a step needs files outside `step.files`, that is a plan defect — `step_review` catches the failed verification and escalates.
+     If a step needs files outside `step.files`, that is a plan defect — `step_review` catches the failed verification and escalates.
 - **approval_gate** — only when hints contain destructive ops (`delete_file`). Emits the pending event, `interrupt()`; resume value approves or rejects (reject → step failed → escalate path).
 - **apply** — no LLM. Mechanical dispatch of hints, in order, to existing primitives in `packages/shared/src/utils/editor/` (`applyTextReplace/Insert/Delete`, `applyAstReplace/Rename/Remove/Insert`, `applyFileInsert/Remove/Rename`). Per hint: re-read the file from disk (a previous hint may have shifted content), require the `anchor` to occur exactly once (`anchor not found` / `anchor ambiguous` → step fails into retry with the exact error), write, then tree-sitter parse — a syntax error fails the step into retry immediately without waiting for `tsc`. All paths resolve inside `cwd`; traversal is a hard failure. The step's files are snapshotted (`fileSnapshots[stepId]`, `null` = file did not exist) before the first write.
 - **verify_step** — runs `typeCheck` when configured (grep for errors in output), then the related test file only (heuristic: `foo.ts → foo.test.ts | __tests__/**/foo.test.ts`), not the whole suite. Per-command timeout, 120s default. Output tail stored for review/retry context.
@@ -79,7 +79,7 @@ plan, context, cwd, sessionId
 stepStates:     Record<stepId, StepStatus>        // pending|running|done|failed|skipped
 currentStepId:  string | null
 currentHints:   ExecutorHint[]
-readerFindings: Record<stepId, ReaderDigest>
+key_findings: Record<stepId, ReaderDigest>
 fileSnapshots:  Record<stepId, Record<file, string | null>>
 retryCounts:    Record<stepId, number>
 lastError:      string | null
@@ -93,13 +93,13 @@ stepResults:    StepResult[]
 
 ## Error handling summary
 
-| Failure | Handling |
-| --- | --- |
+| Failure                                            | Handling                                                                         |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Anchor missing/ambiguous, syntax error after write | Step fails into retry with exact error; step files rolled back to snapshot first |
-| `tsc`/test failure | Same retry path, verification tail in context |
-| Review `blocked`, or retries exhausted (2) | Rollback step files, escalate interrupt |
-| DAG deadlock (failed/skipped dependency) | Escalate |
-| Unexpected node error | Caught in node, step `failed`, escalate |
+| `tsc`/test failure                                 | Same retry path, verification tail in context                                    |
+| Review `blocked`, or retries exhausted (2)         | Rollback step files, escalate interrupt                                          |
+| DAG deadlock (failed/skipped dependency)           | Escalate                                                                         |
+| Unexpected node error                              | Caught in node, step `failed`, escalate                                          |
 
 No silent failures: every terminal failure surfaces to the user with the exact error and step id.
 

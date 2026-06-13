@@ -6,17 +6,36 @@ import type { ExecutorHint } from '@robocode-packages/shared';
 
 const mkState = (cwd: string, hints: ExecutorHint[], extra: Record<string, unknown> = {}) =>
   ({
-    plan: null, context: null, cwd, sessionId: 's', stepResults: [],
-    stepStates: {}, currentStepId: 'edit-a', currentHints: hints,
-    readerFindings: {}, fileSnapshots: {}, retryCounts: {}, appliedOps: {},
-    lastError: null, userGuidance: null, verifyOutput: null, escalationDecision: null,
+    plan: null,
+    context: null,
+    cwd,
+    sessionId: 's',
+    stepResults: [],
+    stepStates: {},
+    currentStepId: 'edit-a',
+    currentHints: hints,
+    key_findings: {},
+    fileSnapshots: {},
+    retryCounts: {},
+    appliedOps: {},
+    lastError: null,
+    userGuidance: null,
+    verifyOutput: null,
+    escalationDecision: null,
     verifyCommands: { typeCheck: null, testRunner: null, lint: null },
     ...extra,
   }) as never;
 
 const hint = (partial: Partial<ExecutorHint> & Pick<ExecutorHint, 'op' | 'file'>): ExecutorHint =>
-  ({ nodeType: null, symbol: null, newSymbol: null, oldText: null, newText: null,
-     target: null, ...partial }) as ExecutorHint;
+  ({
+    nodeType: null,
+    symbol: null,
+    newSymbol: null,
+    oldText: null,
+    newText: null,
+    target: null,
+    ...partial,
+  }) as ExecutorHint;
 
 describe('applyNode', () => {
   let dir: string;
@@ -30,7 +49,12 @@ describe('applyNode', () => {
     const res = await applyNode(
       mkState(dir, [
         hint({ op: 'edit_text', file: 'a.ts', oldText: 'const a = 1;', newText: 'const a = 2;' }),
-        hint({ op: 'edit_text', file: 'a.ts', oldText: 'const a = 2;', newText: 'const a = 2;\nconst b = 3;' }),
+        hint({
+          op: 'edit_text',
+          file: 'a.ts',
+          oldText: 'const a = 2;',
+          newText: 'const a = 2;\nconst b = 3;',
+        }),
       ])
     );
     expect(res.lastError).toBeNull();
@@ -52,9 +76,7 @@ describe('applyNode', () => {
   });
 
   it('snapshots a delete_file target before deletion', async () => {
-    const res = await applyNode(
-      mkState(dir, [hint({ op: 'delete_file', file: 'a.ts' })])
-    );
+    const res = await applyNode(mkState(dir, [hint({ op: 'delete_file', file: 'a.ts' })]));
     expect(res.lastError).toBeNull();
     expect(res.fileSnapshots?.['edit-a']?.['a.ts']).toBe('const a = 1;\n');
     await expect(fs.access(path.join(dir, 'a.ts'))).rejects.toThrow();
