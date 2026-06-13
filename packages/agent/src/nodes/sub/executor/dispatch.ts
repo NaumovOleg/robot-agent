@@ -3,17 +3,14 @@ import * as path from 'node:path';
 import type { ExecutorHint, AstEdit } from '@robocode-packages/shared';
 import {
   applyTextReplace,
-  applyTextInsert,
-  applyTextDelete,
   applyAstReplace,
   applyAstRename,
-  applyAstRemove,
-  applyAstInsert,
   applyFileInsert,
   applyFileRemove,
   applyFileRename,
   checkSyntax,
   createAstParser,
+  isAstSupported,
 } from '@robocode-packages/shared';
 import { isIgnoredPath } from './ignorePaths';
 
@@ -75,58 +72,52 @@ const fuzzyWhitespaceAnchor = (content: string, anchor: string): string | null =
   return matches[0] ?? null;
 };
 
-// Models frequently forget the newline when inserting a whole line/statement, so
-// "after"-inserting onto a line that ends with ';' glues two statements together
-// ("provider';export * from '@screens/faq';"). When inserting at a line boundary,
-// add the missing newline separator so the inserted line lands on its own line.
-const lineSeparatedInsert = (
-  content: string,
-  anchor: string,
-  insertMode: 'before' | 'after' | 'start' | 'end',
-  text: string
-): string => {
-  if (insertMode === 'after') {
-    const at = content.indexOf(anchor);
-    const after = at >= 0 ? content[at + anchor.length] : undefined;
-    const atLineEnd = after === '\n' || after === undefined;
-    if (atLineEnd && !text.startsWith('\n')) return '\n' + text;
-  }
-  if (insertMode === 'before') {
-    const at = content.indexOf(anchor);
-    const before = at > 0 ? content[at - 1] : undefined;
-    const atLineStart = before === '\n' || before === undefined;
-    if (atLineStart && !text.endsWith('\n')) return text + '\n';
-  }
-  return text;
+// LLMs frequently emit TypeScript-compiler node names instead of tree-sitter
+// grammar names for replace_node. Normalize the common ones per language. Unknown
+// names pass through so any valid native tree-sitter type still works. Add other
+// languages here as data — no control-flow change needed.
+const NODE_TYPE_ALIASES: Record<string, Record<string, string>> = {
+  typescript: {
+    VariableDeclaration: 'lexical_declaration',
+    FunctionDeclaration: 'function_declaration',
+    ClassDeclaration: 'class_declaration',
+    InterfaceDeclaration: 'interface_declaration',
+    TypeAliasDeclaration: 'type_alias_declaration',
+    EnumDeclaration: 'enum_declaration',
+    MethodDeclaration: 'method_definition',
+  },
 };
+NODE_TYPE_ALIASES.tsx = NODE_TYPE_ALIASES.typescript;
+NODE_TYPE_ALIASES.javascript = NODE_TYPE_ALIASES.typescript;
 
-const resolveAnchor = (content: string, anchor: string): string => {
+const normalizeNodeType = (language: string, nodeType: string): string =>
+  NODE_TYPE_ALIASES[language]?.[nodeType] ?? nodeType;
+
+// Strict: only the leaked-line-number-prefix repair is allowed silently. Whitespace
+// fuzziness is NOT applied to the actual edit — the formatter normalizes output and
+// a non-match is surfaced as an actionable error instead.
+const resolveAnchorStrict = (content: string, anchor: string): string => {
   if (content.includes(anchor)) return anchor;
-
-  // 1) strip a leaked line-number prefix
   const stripped = anchor.replace(LINE_NUMBER_PREFIX, '');
-  if (stripped !== anchor && stripped.length > 0 && content.includes(stripped)) {
-    return stripped;
-  }
-
-  // 2) whitespace-tolerant match (handles re-indentation / collapsed line breaks)
-  const fuzzy = fuzzyWhitespaceAnchor(content, stripped.length > 0 ? stripped : anchor);
-  if (fuzzy) return fuzzy;
-
-  return anchor; // unchanged — let the underlying op throw a clear error
+  if (stripped !== anchor && stripped.length > 0 && content.includes(stripped)) return stripped;
+  return anchor; // unchanged — let the op throw a clear error
 };
 
-const astEditFromHint = (hint: ExecutorHint, action: AstEdit['action']): AstEdit => ({
+// Diagnostic only: suggest the nearest existing text when a strict match fails, so
+// the repair re-prompt can show the model what's actually in the file.
+export const nearestCandidate = (content: string, anchor: string): string | null =>
+  fuzzyWhitespaceAnchor(content, anchor.replace(LINE_NUMBER_PREFIX, '') || anchor);
+
+const astEditFromHint = (hint: ExecutorHint, action: 'replace' | 'rename', nodeType: string): AstEdit => ({
   mode: 'ast',
   action,
-  // rename locates by symbol text (nodeType is ignored by applyAstRename); the
-  // other AST ops need a real tree-sitter nodeType to find their target.
-  nodeType: action === 'rename' ? hint.nodeType ?? '' : requireField(hint.nodeType, 'nodeType', hint.op),
+  // rename locates by symbol text (applyAstRename ignores nodeType); replace needs it.
+  nodeType,
   symbol: hint.symbol ?? null,
   newSymbol: hint.newSymbol ?? null,
   parentNodeType: null,
-  afterSnippet: action === 'replace' ? hint.newContent ?? null : null,
-  insertSnippet: action === 'insert' ? hint.newContent ?? null : null,
+  afterSnippet: action === 'replace' ? hint.newText ?? null : null,
+  insertSnippet: null,
   beforeSnippet: null,
   reasoning: '',
   file: hint.file,
@@ -142,24 +133,20 @@ const writeAndCheck = async (abs: string, content: string): Promise<void> => {
 // Applies one hint mechanically. Reads the file fresh from disk (previous hints
 // in the same step may have shifted content). Throws with an exact, actionable
 // message on any failure — the caller routes failures into the retry path.
-export const dispatchHint = async (
-  hint: ExecutorHint,
-  cwd: string
-): Promise<DispatchResult> => {
+export const dispatchHint = async (hint: ExecutorHint, cwd: string): Promise<DispatchResult> => {
   const op = hint.op;
 
-  // ── file-level ops (no content read) ────────────────────────────────────────
   if (op === 'create_file') {
     const abs = resolveInside(cwd, hint.file);
-    const content = requireField(hint.newContent, 'newContent', op);
+    const content = requireField(hint.newText, 'newText', op);
     const syntax = await checkSyntax(abs, content);
     if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
     const { absPath } = await applyFileInsert(cwd, {
       mode: 'file', action: 'insert', file: hint.file, insertText: content, reasoning: '',
     });
     if (absPath !== abs) {
-      const postWriteSyntax = await checkSyntax(absPath, content);
-      if (!postWriteSyntax.ok) throw new Error(postWriteSyntax.error ?? 'Syntax check failed (no detail)');
+      const post = await checkSyntax(absPath, content);
+      if (!post.ok) throw new Error(post.error ?? 'Syntax check failed (no detail)');
     }
     return { file: hint.file, summary: `create_file ${hint.file}` };
   }
@@ -174,13 +161,11 @@ export const dispatchHint = async (
     resolveInside(cwd, hint.file);
     const target = requireField(hint.target, 'target', op);
     resolveInside(cwd, target);
-    await applyFileRename(cwd, {
-      mode: 'file', action: 'rename', file: hint.file, target, reasoning: '',
-    });
+    await applyFileRename(cwd, { mode: 'file', action: 'rename', file: hint.file, target, reasoning: '' });
     return { file: target, summary: `rename_file ${hint.file} → ${target}` };
   }
 
-  // ── content ops: fresh read ─────────────────────────────────────────────────
+  // ── content ops: fresh read ──
   const abs = resolveInside(cwd, hint.file);
   let content: string;
   try {
@@ -191,76 +176,37 @@ export const dispatchHint = async (
 
   let next: string;
 
-  if (op === 'replace_text') {
-    const anchor = resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
-    const replaceWith = requireField(hint.newContent, 'newContent', op);
-    // Idempotency: if the old text is gone but the new text is already present, a
-    // prior hint (e.g. a rename) already made this change — treat it as a no-op
-    // instead of failing the step on "Target not found". The length guard avoids
-    // false positives where a short newContent is an incidental substring (e.g.
-    // "x" inside "export").
-    if (
-      replaceWith.length >= anchor.length &&
-      !content.includes(anchor) &&
-      content.includes(replaceWith)
-    ) {
-      return { file: hint.file, summary: `replace_text ${hint.file} (already applied)` };
+  if (op === 'edit_text') {
+    const anchor = resolveAnchorStrict(content, requireField(hint.oldText, 'oldText', op));
+    const replaceWith = requireField(hint.newText, 'newText', op);
+    // Idempotency: old gone but new already present ⇒ a prior hint applied it.
+    if (replaceWith.length >= anchor.length && !content.includes(anchor) && content.includes(replaceWith)) {
+      return { file: hint.file, summary: `edit_text ${hint.file} (already applied)` };
     }
     next = applyTextReplace(content, {
       mode: 'text', action: 'replace', file: hint.file,
       anchor: { type: 'exact', value: anchor },
-      replaceWith,
-      reasoning: '',
+      replaceWith, reasoning: '',
     });
-  } else if (op === 'insert_text') {
-    const insertMode = hint.insertMode ?? 'after';
-    const anchor =
-      insertMode === 'start' || insertMode === 'end'
-        ? (hint.anchor ?? '')
-        : resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
-    const insertText = lineSeparatedInsert(
-      content,
-      anchor,
-      insertMode,
-      requireField(hint.newContent, 'newContent', op)
-    );
-    next = applyTextInsert(content, {
-      mode: 'text', action: 'insert', file: hint.file,
-      anchor: { type: 'exact', value: anchor },
-      insertMode,
-      insertText,
-      reasoning: '',
-    });
-  } else if (op === 'remove_text') {
-    const anchor = resolveAnchor(content, requireField(hint.anchor, 'anchor', op));
-    // Idempotency: nothing to remove if the text is already gone.
-    if (!content.includes(anchor)) {
-      return { file: hint.file, summary: `remove_text ${hint.file} (already removed)` };
-    }
-    next = applyTextDelete(content, {
-      mode: 'text', action: 'remove', file: hint.file,
-      anchor: { type: 'exact', value: anchor },
-      target: anchor,
-      reasoning: '',
-    });
-  } else if (op === 'insert_node') {
-    requireField(hint.newContent, 'newContent', op);
-    next = applyAstInsert(content, astEditFromHint(hint, 'insert'));
   } else {
-    // replace_node | remove_node | rename_symbol — need a parsed tree
-    const { parser } = await createAstParser(abs);
+    // replace_node | rename_symbol — need a parsed tree
+    if (!isAstSupported(abs)) {
+      throw new Error(
+        `[executor/dispatch] ${op} is not available for ${hint.file} (no tree-sitter grammar for this language). Use edit_text instead.`
+      );
+    }
+    const { parser, language } = await createAstParser(abs);
     const tree = parser.parse(content);
     if (!tree) throw new Error(`[executor/dispatch] Cannot parse ${hint.file}`);
 
     if (op === 'replace_node') {
-      requireField(hint.newContent, 'newContent', op);
-      next = applyAstReplace(content, astEditFromHint(hint, 'replace'), tree);
-    } else if (op === 'remove_node') {
-      next = applyAstRemove(content, astEditFromHint(hint, 'remove'), tree);
+      const nodeType = normalizeNodeType(language, requireField(hint.nodeType, 'nodeType', op));
+      requireField(hint.newText, 'newText', op);
+      next = applyAstReplace(content, astEditFromHint(hint, 'replace', nodeType), tree);
     } else if (op === 'rename_symbol') {
       requireField(hint.symbol, 'symbol', op);
       requireField(hint.newSymbol, 'newSymbol', op);
-      next = applyAstRename(content, astEditFromHint(hint, 'rename'), tree);
+      next = applyAstRename(content, astEditFromHint(hint, 'rename', hint.nodeType ?? ''), tree);
     } else {
       throw new Error(`[executor/dispatch] Unknown op: ${op}`);
     }
@@ -268,4 +214,61 @@ export const dispatchHint = async (
 
   await writeAndCheck(abs, next);
   return { file: hint.file, summary: `${op} ${hint.file}` };
+};
+
+// Dry-run: resolve a hint against current disk content WITHOUT writing. Throws the
+// same actionable error dispatchHint would, plus a nearest-candidate suggestion for
+// text anchors. Used by the validate node before any disk mutation.
+export const validateHint = async (hint: ExecutorHint, cwd: string): Promise<void> => {
+  const op = hint.op;
+  if (op === 'create_file') {
+    const abs = resolveInside(cwd, hint.file);
+    const content = requireField(hint.newText, 'newText', op);
+    const syntax = await checkSyntax(abs, content);
+    if (!syntax.ok) throw new Error(syntax.error ?? 'Syntax check failed (no detail)');
+    return;
+  }
+  if (op === 'delete_file') { resolveInside(cwd, hint.file); return; }
+  if (op === 'rename_file') {
+    resolveInside(cwd, hint.file);
+    resolveInside(cwd, requireField(hint.target, 'target', op));
+    return;
+  }
+
+  const abs = resolveInside(cwd, hint.file);
+  let content: string;
+  try {
+    content = await fs.readFile(abs, 'utf-8');
+  } catch {
+    throw new Error(`[executor/dispatch] File not found: ${hint.file}`);
+  }
+
+  if (op === 'edit_text') {
+    const oldText = requireField(hint.oldText, 'oldText', op);
+    const anchor = resolveAnchorStrict(content, oldText);
+    const replaceWith = hint.newText ?? '';
+    if (content.includes(anchor)) return; // resolvable
+    if (replaceWith.length >= oldText.length && content.includes(replaceWith)) return; // idempotent
+    const near = nearestCandidate(content, oldText);
+    throw new Error(
+      `oldText not found: "${oldText.replace(/\s+/g, ' ').trim().slice(0, 120)}"` +
+        (near ? `\n  Did you mean (actual file text): "${near.replace(/\s+/g, ' ').trim().slice(0, 120)}"` : '')
+    );
+  }
+
+  // replace_node | rename_symbol
+  if (!isAstSupported(abs)) {
+    throw new Error(
+      `${op} unavailable for ${hint.file} (no tree-sitter grammar). Re-express this edit as edit_text.`
+    );
+  }
+  const { parser, language } = await createAstParser(abs);
+  const tree = parser.parse(content);
+  if (!tree) throw new Error(`Cannot parse ${hint.file}`);
+  if (op === 'replace_node') {
+    const nodeType = normalizeNodeType(language, requireField(hint.nodeType, 'nodeType', op));
+    applyAstReplace(content, astEditFromHint(hint, 'replace', nodeType), tree); // throws if node not found
+  } else {
+    applyAstRename(content, astEditFromHint(hint, 'rename', hint.nodeType ?? ''), tree);
+  }
 };
