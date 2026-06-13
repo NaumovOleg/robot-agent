@@ -205,6 +205,30 @@ export const ChatScreen: React.FC = () => {
         setIsLoading(false);
         setThinkingPhrase(null);
       }),
+      EventBus.on('executor:step:start', ({ sessionId, title, index, total }) => {
+        if (sessionId !== id) return;
+        setThinkingPhrase(`Step ${index}/${total}: ${title}`);
+      }),
+      EventBus.on('executor:step:done', ({ sessionId, stepId, status, retries }) => {
+        if (sessionId !== id) return;
+        const icon = status === 'done' ? '✔' : status === 'failed' ? '✖' : '↷';
+        const suffix = retries > 0 ? ` (retries: ${retries})` : '';
+        setStaticItems(prev => [
+          ...prev,
+          { kind: 'system', id: makeId(), content: `${icon} ${stepId} — ${status}${suffix}` },
+        ]);
+      }),
+      EventBus.on('executor:edit:applied', ({ sessionId, file, op }) => {
+        if (sessionId !== id) return;
+        setStaticItems(prev => [
+          ...prev,
+          { kind: 'system', id: makeId(), content: `✎ ${file} (${op})` },
+        ]);
+      }),
+      EventBus.on('executor:step:verify', ({ sessionId, ok }) => {
+        if (sessionId !== id) return;
+        setThinkingPhrase(ok ? 'Verifying… ok' : 'Verifying… failed');
+      }),
       EventBus.on('agent:compact_complete', ({ sessionId: sid, originalCount }) => {
         if (sid !== id) return;
         const updated = MessageService.load(sid);
