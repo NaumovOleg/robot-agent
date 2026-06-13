@@ -15,13 +15,9 @@ export const summarizeHint = (h: ExecutorHint): string => {
     case 'rename_file':
       return `rename_file ${h.file}→${h.target}`;
     case 'replace_node':
-    case 'remove_node':
-    case 'insert_node':
-      return `${h.op} ${h.file} <${h.nodeType ?? '?'}${h.symbol ? ` ${h.symbol}` : ''}>`;
-    case 'replace_text':
-    case 'remove_text':
-    case 'insert_text':
-      return `${h.op} ${h.file} @"${clip(h.anchor ?? '', 40)}"`;
+      return `replace_node ${h.file} <${h.nodeType ?? '?'}${h.symbol ? ` ${h.symbol}` : ''}>`;
+    case 'edit_text':
+      return `edit_text ${h.file} @"${clip(h.oldText ?? '', 40)}"`;
     case 'create_file':
     case 'delete_file':
       return `${h.op} ${h.file}`;

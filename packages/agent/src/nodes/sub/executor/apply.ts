@@ -6,12 +6,11 @@ import { takeSnapshot } from './snapshots';
 
 const hintDiff = (
   op: string,
-  anchor: string | null | undefined,
-  newContent: string | null | undefined
+  oldText: string | null | undefined,
+  newText: string | null | undefined
 ): string => {
-  const added = newContent ? `+ ${newContent.slice(0, 400)}` : '';
-  if (op === 'insert_text') return added || op; // anchor is position, not removed text
-  const removed = anchor ? `- ${anchor.slice(0, 200)}` : '';
+  const removed = oldText ? `- ${oldText.slice(0, 200)}` : '';
+  const added = newText ? `+ ${newText.slice(0, 400)}` : '';
   return [removed, added].filter(Boolean).join('\n') || op;
 };
 
@@ -47,7 +46,7 @@ export const applyNode = async (state: ExecutorStateType) => {
         diff:
           hint.op === 'rename_file' && hint.target
             ? `${hint.file} → ${hint.target}`
-            : hintDiff(hint.op, hint.anchor, hint.newContent),
+            : hintDiff(hint.op, hint.oldText, hint.newText),
       });
     } catch (err) {
       const message = `hint ${i + 1}/${currentHints.length} (${hint.op} ${hint.file}): ${String(
